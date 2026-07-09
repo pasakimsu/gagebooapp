@@ -1,0 +1,32 @@
+/* calendarStyle.css */
+
+.react-calendar {
+    width: 100%;
+    max-width: 430px;
+  }
+  
+  .react-calendar__tile {
+    min-height: 80px !important;
+    padding: 4px !important;
+  }
+  /* calendarStyle.css */
+
+  .duty-tile abbr::after {
+    content: "당";
+    font-size: 8px;
+    background-color: #16a34a;
+    color: white;
+    padding: 0 3px;
+    border-radius: 3px;
+    margin-left: 2px;
+    vertical-align: middle;
+    display: inline-block;
+    line-height: 1;
+    transform: translateY(-1px);
+  }
+  
+  
+  
+  
+  
+  
