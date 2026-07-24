@@ -139,9 +139,6 @@ export default function ScheduleList({ selectedDate, refreshKey, onRefresh }: Pr
             }`}>
               {item.content}
             </span>
-            {!item.id.startsWith("lunar-") && !item.id.startsWith("solar-") && (
-              <button onClick={() => { setToDeleteId(item.id); setShowConfirm(true); }} className="bg-red-600/80 hover:bg-red-700 text-white text-[10px] px-3 py-1.5 rounded-lg transition shadow-sm font-bold">삭제</button>
-            )}
           </li>
         ))}
       </ul>

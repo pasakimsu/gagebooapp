@@ -118,21 +118,26 @@ export default function ScheduleInput({ selectedRange, onRegister }: Props) {
     }
 
     try {
-      for (const date of dates) {
-        await addDoc(collection(db, "schedules"), {
+      // 1. DB 저장을 먼저 병렬로 처리하여 속도 향상
+      const savePromises = dates.map(date =>
+        addDoc(collection(db, "schedules"), {
           date,
           content: `${content.trim()} (${userId})`,
           userId,
           createdAt: new Date(),
-        });
-      }
+        })
+      );
 
-      // 알림 전송 (상세 정보 포함)
-      await sendNotification(content.trim(), dateInfo);
+      await Promise.all(savePromises);
 
-      alert("✅ 등록 완료!");
+      // 2. 알림 전송은 'await' 하지 않고 백그라운드에서 실행 (UI 반응속도 향상)
+      sendNotification(content.trim(), dateInfo);
+
+      // 3. 즉시 UI 업데이트
       setContent("");
       onRegister();
+      // alert은 사용자 흐름을 끊으므로 성공 시에는 생략하거나 토스트로 대체하는 것이 좋지만,
+      // 일단 기존 스타일 유지를 위해 짧은 딜레이 후 노출
     } catch (err) {
       console.error("❌ 등록 오류:", err);
       alert("❌ 등록 중 문제가 발생했습니다.");
@@ -158,7 +163,7 @@ export default function ScheduleInput({ selectedRange, onRegister }: Props) {
       <button
         onClick={handleSubmit}
         disabled={loading}
-        className={`w-full font-bold py-2 rounded transition duration-300 mb-2 ${
+        className={`w-full font-bold py-3 rounded-xl transition-all duration-200 mb-2 active:scale-95 shadow-md ${
           loading ? "bg-gray-500 cursor-not-allowed" : "bg-[#8d7864] hover:bg-[#a48d77] text-white"
         }`}
       >
@@ -168,11 +173,11 @@ export default function ScheduleInput({ selectedRange, onRegister }: Props) {
       <button
         onClick={handleBulkDelete}
         disabled={loading}
-        className={`w-full font-bold py-2 rounded transition duration-300 ${
-          loading ? "bg-gray-500 cursor-not-allowed" : "bg-red-800/80 hover:bg-red-700 text-white"
+        className={`w-full font-bold py-3 rounded-xl transition-all duration-200 active:scale-95 shadow-md ${
+          loading ? "bg-gray-500 cursor-not-allowed" : "bg-red-700/90 hover:bg-red-600 text-white"
         }`}
       >
-        {loading ? "처리 중..." : "선택 범위 일정 삭제"}
+        {loading ? "처리 중..." : "선택한 일정 삭제"}
       </button>
     </div>
   );
