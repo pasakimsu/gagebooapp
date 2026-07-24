@@ -4,10 +4,15 @@ import { getMessaging } from "firebase-admin/messaging";
 
 if (!getApps().length) {
   try {
-    const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-    const serviceAccount = serviceAccountKey ? JSON.parse(serviceAccountKey) : null;
+    let serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
-    if (serviceAccount) {
+    if (serviceAccountKey) {
+      serviceAccountKey = serviceAccountKey.trim();
+      if (serviceAccountKey.startsWith("'") && serviceAccountKey.endsWith("'")) {
+        serviceAccountKey = serviceAccountKey.slice(1, -1);
+      }
+
+      const serviceAccount = JSON.parse(serviceAccountKey);
       initializeApp({
         credential: cert(serviceAccount),
       });

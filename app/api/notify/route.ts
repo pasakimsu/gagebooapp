@@ -4,13 +4,20 @@ import { getMessaging } from "firebase-admin/messaging";
 
 if (!getApps().length) {
   try {
-    const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-    const serviceAccount = serviceAccountKey ? JSON.parse(serviceAccountKey) : null;
+    let serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
-    if (serviceAccount) {
+    if (serviceAccountKey) {
+      // 혹시 앞뒤에 따옴표가 붙어있으면 제거
+      serviceAccountKey = serviceAccountKey.trim();
+      if (serviceAccountKey.startsWith("'") && serviceAccountKey.endsWith("'")) {
+        serviceAccountKey = serviceAccountKey.slice(1, -1);
+      }
+
+      const serviceAccount = JSON.parse(serviceAccountKey);
       initializeApp({
         credential: cert(serviceAccount),
       });
+      console.log("Firebase Admin Initialized successfully");
     }
   } catch (error) {
     console.error("Firebase Admin initialization error:", error);
@@ -36,6 +43,24 @@ export async function POST(req: NextRequest) {
         body,
       },
       topic: "family",
+      // iOS 전용 설정 추가 (소리 및 우선순위)
+      apns: {
+        payload: {
+          aps: {
+            sound: "default",
+            badge: 1,
+            contentAvailable: true,
+          },
+        },
+      },
+      // 안드로이드 전용 설정
+      android: {
+        priority: "high" as const,
+        notification: {
+          sound: "default",
+          clickAction: "TOP_STORY_ACTIVITY",
+        },
+      },
     };
 
     const response = await getMessaging().send(message);
