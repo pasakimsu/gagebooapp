@@ -45,7 +45,7 @@ export default function NotificationPermission() {
 
         if (currentToken) {
           console.log("FCM Token 획득 성공");
-          await axios.post("/api/subscribe", { token: currentToken });
+          await axios.post<{ success: boolean }>("/api/subscribe", { token: currentToken });
 
           // Firestore에도 저장 (사용자가 확인할 수 있도록)
           try {
@@ -95,7 +95,7 @@ export default function NotificationPermission() {
         <button
           onClick={async () => {
             try {
-              const res = await axios.post("/api/notify", {
+              const res = await axios.post<{ success: boolean }>("/api/notify", {
                 title: "🔔 테스트 알림",
                 body: "알림이 정상적으로 작동합니다!",
               });
