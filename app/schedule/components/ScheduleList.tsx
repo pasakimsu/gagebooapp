@@ -180,7 +180,7 @@ export default function ScheduleList({ selectedRange, refreshKey, onRefresh }: P
             {!item.id.startsWith("lunar-") && !item.id.startsWith("solar-") && (
               <button
                 onClick={() => handleDeleteClick(item)}
-                className="w-1/8 ml-2 bg-red-700/90 hover:bg-red-600 text-white text-[10px] px-2 py-1.5 rounded-lg transition shadow-md font-bold active:scale-95"
+                className="ml-3 bg-red-700/90 hover:bg-red-600 text-white text-xs px-4 py-2 rounded-xl transition shadow-lg font-bold active:scale-90"
               >
                 삭제
               </button>
