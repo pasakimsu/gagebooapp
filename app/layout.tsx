@@ -36,7 +36,6 @@ export default function RootLayout({
   return (
     <html lang="ko" className="dark">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <NotificationPermission />
         {children}
       </body>
     </html>

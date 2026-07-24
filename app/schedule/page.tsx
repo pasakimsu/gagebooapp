@@ -5,6 +5,7 @@ import CalendarView from "./components/CalendarView";
 import ScheduleInput from "./components/ScheduleInput";
 import ScheduleList from "./components/ScheduleList";
 import AuthGuard from "@/components/AuthGuard";
+import NotificationPermission from "@/components/NotificationPermission";
 import { db, doc, getDoc, onSnapshot, setDoc } from "@/lib/firebase";
 
 export default function SchedulePage() {
@@ -81,6 +82,8 @@ export default function SchedulePage() {
     <AuthGuard>
       <div className="flex flex-col items-center min-h-screen justify-center bg-[#2f2a25] text-white p-6">
         <h2 className="text-2xl font-bold mb-4">📅 일정 공유 캘린더</h2>
+
+        <NotificationPermission />
 
         {userId === "bak" && (
           <div className="mb-6 w-full max-w-md">
