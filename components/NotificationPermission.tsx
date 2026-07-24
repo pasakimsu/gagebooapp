@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { messaging } from "@/lib/firebase";
-import { getToken } from "firebase/messaging";
+import { getToken, onMessage } from "firebase/messaging";
 import axios from "axios";
 
 export default function NotificationPermission() {
@@ -19,7 +19,16 @@ export default function NotificationPermission() {
         autoSubscribe();
       }
     }
-  }, []);
+
+    // 🔔 앱이 켜져 있을 때(포그라운드) 알림 수신 처리
+    if (messaging) {
+      const unsubscribe = onMessage(messaging, (payload) => {
+        console.log("Foreground message:", payload);
+        alert(`🔔 [알림] ${payload.notification?.title}\n\n${payload.notification?.body}`);
+      });
+      return () => unsubscribe();
+    }
+  }, [messaging]);
 
   const autoSubscribe = async () => {
     try {
@@ -30,8 +39,11 @@ export default function NotificationPermission() {
 
       const currentToken = await getToken(messaging, { vapidKey });
       if (currentToken) {
-        console.log("자동 구독 확인 중...");
-        await axios.post("/api/subscribe", { token: currentToken });
+        // 서버에 구독 및 Firestore 저장 요청
+        await axios.post("/api/subscribe", {
+          token: currentToken,
+          userId: localStorage.getItem("userId") || "guest"
+        });
       }
     } catch (e) {
       console.error("자동 구독 확인 실패:", e);
