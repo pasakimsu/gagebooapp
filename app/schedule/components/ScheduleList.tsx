@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { db, collection, onSnapshot, deleteDoc, doc } from "@/lib/firebase";
+import { db, collection, onSnapshot, deleteDoc, doc, getDocs, query, where } from "@/lib/firebase";
+import axios from "axios";
 
 interface Props {
-  selectedDate: Date;
+  selectedRange: [Date, Date];
   refreshKey: number;
   onRefresh: () => void;
 }
@@ -44,17 +45,9 @@ const LUNAR_ANNIVERSARIES: Record<string, string[]> = {
   "2034-04-19": ["🎂 장인생신(음력 03.01)"], "2035-04-08": ["🎂 장인생신(음력 03.01)"],
 };
 
-export default function ScheduleList({ selectedDate, refreshKey, onRefresh }: Props) {
+export default function ScheduleList({ selectedRange, refreshKey, onRefresh }: Props) {
   const [schedules, setSchedules] = useState<ScheduleData[]>([]);
-  const [toDeleteId, setToDeleteId] = useState<string | null>(null);
-  const [showConfirm, setShowConfirm] = useState(false);
-
-  const getOldDateStr = (date: Date) => {
-    const y = date.getFullYear();
-    const m = date.getMonth() + 1;
-    const d = date.getDate();
-    return `${y}-${m}-${d}`;
-  };
+  const [loading, setLoading] = useState(false);
 
   const getStandardDateStr = (date: Date) => {
     const y = date.getFullYear();
@@ -63,9 +56,12 @@ export default function ScheduleList({ selectedDate, refreshKey, onRefresh }: Pr
     return `${y}-${m}-${d}`;
   };
 
-  const oldDateStr = getOldDateStr(selectedDate);
-  const stdDateStr = getStandardDateStr(selectedDate);
-  const mmDd = stdDateStr.slice(5);
+  const getOldDateStr = (date: Date) => {
+    const y = date.getFullYear();
+    const m = date.getMonth() + 1;
+    const d = date.getDate();
+    return `${y}-${m}-${d}`;
+  };
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "schedules"), (snapshot) => {
@@ -74,56 +70,113 @@ export default function ScheduleList({ selectedDate, refreshKey, onRefresh }: Pr
         ...(doc.data() as Omit<ScheduleData, "id">),
       }));
 
-      const filtered = dbData.filter((s) => s.date === oldDateStr || s.date === stdDateStr);
-
-      // 1. 양력 기념일 추가 (파란색)
-      if (SOLAR_ANNIVERSARIES[mmDd]) {
-        filtered.push({
-          id: `solar-${stdDateStr}`,
-          date: stdDateStr,
-          content: SOLAR_ANNIVERSARIES[mmDd]
-        });
+      const [startDate, endDate] = selectedRange;
+      const rangeDates: string[] = [];
+      const current = new Date(startDate);
+      while (current <= endDate) {
+        rangeDates.push(getStandardDateStr(current));
+        rangeDates.push(getOldDateStr(current));
+        current.setDate(current.getDate() + 1);
       }
 
-      // 2. 음력 기념일 추가 (노란색)
-      if (LUNAR_ANNIVERSARIES[stdDateStr]) {
-        LUNAR_ANNIVERSARIES[stdDateStr].forEach((content, i) => {
+      // 선택된 범위 내의 일정 필터링
+      const filtered = dbData.filter((s) => rangeDates.includes(s.date));
+
+      // 기념일 추가 로직 (선택된 범위 내의 모든 날짜에 대해)
+      const currentAnniv = new Date(startDate);
+      while (currentAnniv <= endDate) {
+        const std = getStandardDateStr(currentAnniv);
+        const mmDd = std.slice(5);
+
+        if (SOLAR_ANNIVERSARIES[mmDd]) {
           filtered.push({
-            id: `lunar-${stdDateStr}-${i}`,
-            date: stdDateStr,
-            content
+            id: `solar-${std}`,
+            date: std,
+            content: SOLAR_ANNIVERSARIES[mmDd]
           });
-        });
+        }
+        if (LUNAR_ANNIVERSARIES[std]) {
+          LUNAR_ANNIVERSARIES[std].forEach((content, i) => {
+            filtered.push({
+              id: `lunar-${std}-${i}`,
+              date: std,
+              content
+            });
+          });
+        }
+        currentAnniv.setDate(currentAnniv.getDate() + 1);
       }
 
       setSchedules(filtered);
     });
 
     return () => unsubscribe();
-  }, [selectedDate, refreshKey]);
+  }, [selectedRange, refreshKey]);
 
-  const handleDelete = async () => {
-    if (!toDeleteId) return;
-    if (toDeleteId.startsWith("lunar-") || toDeleteId.startsWith("solar-")) {
-      alert("⚠️ 자동 등록된 기념일은 삭제할 수 없습니다.");
-      setShowConfirm(false); setToDeleteId(null);
+  const handleBulkDelete = async () => {
+    const [startDate, endDate] = selectedRange;
+    const s = new Date(startDate);
+    const e = new Date(endDate);
+    const isSameDay = s.toDateString() === e.toDateString();
+
+    const dateInfo = isSameDay
+      ? `${s.getMonth() + 1}월 ${s.getDate()}일`
+      : `${s.getMonth() + 1}/${s.getDate()} ~ ${e.getMonth() + 1}/${e.getDate()}`;
+
+    if (!confirm(`⚠️ ${dateInfo} 기간의 모든 일정을 삭제하시겠습니까?`)) {
       return;
     }
+
+    setLoading(true);
     try {
-      await deleteDoc(doc(db, "schedules", toDeleteId));
-      onRefresh(); setShowConfirm(false); setToDeleteId(null);
+      const rangeDates: string[] = [];
+      const current = new Date(startDate);
+      while (current <= endDate) {
+        rangeDates.push(getStandardDateStr(current));
+        rangeDates.push(getOldDateStr(current));
+        current.setDate(current.getDate() + 1);
+      }
+
+      const schedulesRef = collection(db, "schedules");
+      const q = query(schedulesRef, where("date", "in", rangeDates.slice(0, 10))); // query 'in' limit is 10
+
+      // 'in' 쿼리는 최대 10개까지만 가능하므로, 안전하게 전체 데이터를 가져와서 필터링하거나 루프를 돕니다.
+      // 여기서는 성능과 안정성을 위해 기존의 루프 방식을 유지하되 최적화합니다.
+      const snapshot = await getDocs(schedulesRef);
+      const toDelete = snapshot.docs.filter(doc => rangeDates.includes(doc.data().date));
+
+      const deletePromises = toDelete.map(d => deleteDoc(doc(db, "schedules", d.id)));
+      await Promise.all(deletePromises);
+
+      // 알림 전송 (비동기)
+      const userId = localStorage.getItem("userId");
+      axios.post("/api/notify", {
+        title: "🗑️ 일정 일괄 삭제",
+        body: `${userId || "가족"}님이 ${dateInfo} 기간의 일정을 삭제했습니다.`,
+      }).catch(console.error);
+
+      alert("✅ 삭제가 완료되었습니다.");
+      onRefresh();
     } catch (error) {
       console.error(error);
       alert("❌ 삭제 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
     }
   };
 
   if (schedules.length === 0) return null;
 
+  const [startDate, endDate] = selectedRange;
+  const isSameDay = startDate.toDateString() === endDate.toDateString();
+  const headerText = isSameDay
+    ? `${getStandardDateStr(startDate)}`
+    : `${getStandardDateStr(startDate)} ~ ${getStandardDateStr(endDate)}`;
+
   return (
     <div className="mt-4 w-full max-w-md text-sm relative text-white">
-      <h3 className="font-semibold mb-2 px-1">📌 {stdDateStr} 일정 목록</h3>
-      <ul className="space-y-2">
+      <h3 className="font-semibold mb-2 px-1">📌 {headerText} 일정 목록</h3>
+      <ul className="space-y-2 mb-4">
         {schedules.map((item) => (
           <li key={item.id} className="flex justify-between items-center bg-[#3a312a] p-3 rounded-xl shadow-sm border border-brownBorder/30">
             <span className={`truncate font-bold ${
@@ -143,17 +196,15 @@ export default function ScheduleList({ selectedDate, refreshKey, onRefresh }: Pr
         ))}
       </ul>
 
-      {showConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 backdrop-blur-sm">
-          <div className="bg-[#2f2a25] text-white p-6 rounded-2xl shadow-2xl text-center w-72 border border-brownBorder">
-            <p className="mb-6 font-bold">정말 삭제하시겠습니까?</p>
-            <div className="flex justify-center gap-3">
-              <button onClick={handleDelete} className="bg-red-600 text-white px-5 py-2 rounded-xl font-bold hover:bg-red-700 shadow-md">삭제</button>
-              <button onClick={() => { setShowConfirm(false); setToDeleteId(null); }} className="bg-gray-600 text-white px-5 py-2 rounded-xl font-bold hover:bg-gray-500 shadow-md">취소</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <button
+        onClick={handleBulkDelete}
+        disabled={loading}
+        className={`w-full font-bold py-3 rounded-xl transition-all duration-200 active:scale-95 shadow-md ${
+          loading ? "bg-gray-500 cursor-not-allowed" : "bg-red-700/90 hover:bg-red-600 text-white"
+        }`}
+      >
+        {loading ? "삭제 중..." : "일정 삭제"}
+      </button>
     </div>
   );
 }

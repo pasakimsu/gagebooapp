@@ -19,66 +19,18 @@ export default function ScheduleInput({ selectedRange, onRegister }: Props) {
     if (id) setUserId(id);
   }, []);
 
-  const sendNotification = async (text: string, dateInfo: string, type: "등록" | "삭제" = "등록") => {
+  const sendNotification = async (text: string, dateInfo: string) => {
     try {
       const safeDate = dateInfo || "일자미상";
-      const messageBody = type === "등록"
-        ? `${userId || "가족"}님이 ${safeDate} [${text}] 일정을 등록했습니다.`
-        : `${userId || "가족"}님이 ${safeDate} 기간의 일정을 일괄 삭제했습니다.`;
+      const messageBody = `${userId || "가족"}님이 ${safeDate} [${text}] 일정을 등록했습니다.`;
 
       await axios.post("/api/notify", {
-        title: type === "등록" ? "📅 새로운 일정 등록" : "🗑️ 일정 일괄 삭제",
+        title: "📅 새로운 일정 등록",
         body: messageBody,
       });
       console.log("Broadcast notification sent:", messageBody);
     } catch (err) {
       console.error("Failed to send notification:", err);
-    }
-  };
-
-  const handleBulkDelete = async () => {
-    const [startDate, endDate] = selectedRange;
-    const dateInfo = startDate.toDateString() === endDate.toDateString()
-      ? `${startDate.getMonth() + 1}월 ${startDate.getDate()}일`
-      : `${startDate.getMonth() + 1}/${startDate.getDate()} ~ ${endDate.getMonth() + 1}/${endDate.getDate()}`;
-
-    if (!confirm(`⚠️ ${dateInfo} 기간의 모든 일정을 삭제하시겠습니까?`)) {
-      return;
-    }
-
-    setLoading(true);
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const dates: string[] = [];
-
-    while (start <= end) {
-      const dateStr = start
-        .toLocaleDateString("ko-KR")
-        .replaceAll(". ", "-")
-        .replace(".", "");
-      dates.push(dateStr);
-      start.setDate(start.getDate() + 1);
-    }
-
-    try {
-      const schedulesRef = collection(db, "schedules");
-
-      for (const date of dates) {
-        const q = query(schedulesRef, where("date", "==", date));
-        const querySnapshot = await getDocs(q);
-
-        const deletePromises = querySnapshot.docs.map((d) => deleteDoc(doc(db, "schedules", d.id)));
-        await Promise.all(deletePromises);
-      }
-
-      await sendNotification("", dateInfo, "삭제");
-      alert("✅ 일괄 삭제가 완료되었습니다.");
-      onRegister();
-    } catch (err) {
-      console.error("❌ 삭제 오류:", err);
-      alert("❌ 삭제 중 문제가 발생했습니다.");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -163,21 +115,11 @@ export default function ScheduleInput({ selectedRange, onRegister }: Props) {
       <button
         onClick={handleSubmit}
         disabled={loading}
-        className={`w-full font-bold py-3 rounded-xl transition-all duration-200 mb-2 active:scale-95 shadow-md ${
+        className={`w-full font-bold py-3 rounded-xl transition-all duration-200 active:scale-95 shadow-md ${
           loading ? "bg-gray-500 cursor-not-allowed" : "bg-[#8d7864] hover:bg-[#a48d77] text-white"
         }`}
       >
         {loading ? "처리 중..." : "일정 등록"}
-      </button>
-
-      <button
-        onClick={handleBulkDelete}
-        disabled={loading}
-        className={`w-full font-bold py-3 rounded-xl transition-all duration-200 active:scale-95 shadow-md ${
-          loading ? "bg-gray-500 cursor-not-allowed" : "bg-red-700/90 hover:bg-red-600 text-white"
-        }`}
-      >
-        {loading ? "처리 중..." : "선택한 일정 삭제"}
       </button>
     </div>
   );

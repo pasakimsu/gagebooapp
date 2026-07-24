@@ -125,7 +125,7 @@ export default function SchedulePage() {
         />
 
         <ScheduleList
-          selectedDate={selectedRange[0]} // 시작 날짜 기준
+          selectedRange={selectedRange}
           refreshKey={refreshKey}
           onRefresh={handleRefresh}
         />
