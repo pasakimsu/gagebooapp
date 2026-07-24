@@ -8,6 +8,7 @@ import axios from "axios";
 export default function NotificationPermission() {
   const [permission, setPermission] = useState<string>("default");
   const [loading, setLoading] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string>("");
 
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -24,8 +25,7 @@ export default function NotificationPermission() {
     if (messaging) {
       const unsubscribe = onMessage(messaging, (payload) => {
         console.log("Foreground message:", payload);
-        // alert 제거 -> 콘솔 로그만 남기거나 필요시 작은 UI 토스트 알림으로 대체 가능
-        // 지금은 안정성을 위해 콘솔 로그만 유지
+        // alert 제거 -> 콘솔 로그만 유지 (안정성)
       });
       return () => unsubscribe();
     }
@@ -60,53 +60,45 @@ export default function NotificationPermission() {
       }
 
       // 1. 서비스 워커 명시적 등록 및 대기 (iOS 필수)
-      let registration: ServiceWorkerRegistration;
       if ("serviceWorker" in navigator) {
-        registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
-        // 서비스 워커가 준비될 때까지 잠시 대기
+        const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
         await navigator.serviceWorker.ready;
-      } else {
-        alert("서비스 워커를 지원하지 않는 브라우저입니다.");
-        return;
-      }
 
-      if (!messaging) {
-        alert("Firebase 메시징 초기화에 실패했습니다.");
-        return;
-      }
-
-      const status = await Notification.requestPermission();
-      setPermission(status);
-
-      if (status === "granted") {
-        const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
-
-        if (!vapidKey) {
-          console.warn("VAPID Key가 설정되지 않았습니다.");
+        if (!messaging) {
+          alert("Firebase 메시징 초기화에 실패했습니다.");
           return;
         }
 
-        // 2. 토큰 가져오기 (등록 객체를 명시적으로 전달)
-        const currentToken = await getToken(messaging, {
-          vapidKey: vapidKey,
-          serviceWorkerRegistration: registration
-        });
+        const status = await Notification.requestPermission();
+        setPermission(status);
 
-        if (currentToken) {
-          console.log("획득한 토큰:", currentToken);
-          const userId = localStorage.getItem("userId") || "guest";
-          const res = await axios.post<{ success: boolean }>("/api/subscribe", {
-            token: currentToken,
-            userId
+        if (status === "granted") {
+          const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+          if (!vapidKey) return;
+
+          // 2. 토큰 가져오기 (등록 객체를 명시적으로 전달)
+          const currentToken = await getToken(messaging, {
+            vapidKey: vapidKey,
+            serviceWorkerRegistration: registration
           });
 
-          if (res.data.success) {
-            alert("✅ 알림 설정 완료! 이제 앱을 끄고 PC에서 테스트해보세요.");
+          if (currentToken) {
+            console.log("획득한 토큰:", currentToken);
+            const userId = localStorage.getItem("userId") || "guest";
+            const res = await axios.post<{ success: boolean }>("/api/subscribe", {
+              token: currentToken,
+              userId
+            });
+
+            if (res.data.success) {
+              alert("✅ 알림 설정 완료! 이제 앱을 끄고 PC에서 테스트해보세요.");
+            }
           }
+        } else if (status === "denied") {
+          alert("알림 권한이 거부되었습니다. 설정에서 직접 허용해 주세요.");
         }
-      }
-else if (status === "denied") {
-        alert("알림 권한이 거부되었습니다. 설정에서 직접 허용해 주세요.");
+      } else {
+        alert("서비스 워커를 지원하지 않는 브라우저입니다.");
       }
     } catch (err) {
       console.error("알림 설정 중 오류 발생:", err);
@@ -144,7 +136,6 @@ else if (status === "denied") {
                   body: "알림이 정상적으로 작동합니다!",
                 });
                 if (res.data.success) {
-                  // 알림 전송 후 안내 문구만 변경
                   setDebugInfo("테스트 알림을 보냈습니다. 즉시 앱을 종료하고 확인하세요.");
                   setTimeout(() => setDebugInfo(""), 5000);
                 }
