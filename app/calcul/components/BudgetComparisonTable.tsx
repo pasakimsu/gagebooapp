@@ -31,16 +31,16 @@ export default function BudgetComparisonTable({ userBudgets }: { userBudgets: Bu
           <tbody>
             {userBudgets.map((budget, index) => (
               <tr key={index} className="text-center">
-                <td className={`border border-gray-600 p-1 sm:p-2 font-bold text-[10px] sm:text-sm truncate ${budget.userId === 'bak' ? 'text-emerald-400' : 'text-red-400'}`}>
+                <td className={`border border-gray-600 p-0.5 sm:p-2 font-bold text-[11px] sm:text-sm truncate ${budget.userId === 'bak' ? 'text-emerald-400' : 'text-red-400'}`}>
                   {budget.userId}
                 </td>
-                <td className="border border-gray-600 p-1 sm:p-2 text-[9px] sm:text-sm break-all">
-                  {budget.allowance.toLocaleString()}<span className="text-[8px] sm:text-xs ml-0.5 text-gray-400">원</span>
+                <td className="border border-gray-600 p-0.5 sm:p-2 text-[10px] sm:text-sm tracking-tighter whitespace-nowrap">
+                  {budget.allowance.toLocaleString()}<span className="text-[8px] sm:text-xs ml-0.5 text-gray-500">원</span>
                 </td>
-                <td className="border border-gray-600 p-1 sm:p-2 text-[9px] sm:text-sm break-all">
-                  {budget.salary.toLocaleString()}<span className="text-[8px] sm:text-xs ml-0.5 text-gray-400">원</span>
+                <td className="border border-gray-600 p-0.5 sm:p-2 text-[10px] sm:text-sm tracking-tighter whitespace-nowrap">
+                  {budget.salary.toLocaleString()}<span className="text-[8px] sm:text-xs ml-0.5 text-gray-500">원</span>
                 </td>
-                <td className="border border-gray-600 p-1 sm:p-2 text-[10px] sm:text-sm font-bold text-[#FFC90E] break-all">
+                <td className="border border-gray-600 p-0.5 sm:p-2 text-[11px] sm:text-sm font-bold text-[#FFC90E] tracking-tighter whitespace-nowrap">
                   {budget.totalSalary.toLocaleString()}<span className="text-[8px] sm:text-xs ml-0.5 opacity-70">원</span>
                 </td>
               </tr>
@@ -54,30 +54,30 @@ export default function BudgetComparisonTable({ userBudgets }: { userBudgets: Bu
         <table className="w-full text-white border-collapse border border-gray-600 table-fixed">
           <thead>
             <tr className="bg-[#3a312a]">
-              <th className="border border-gray-600 p-1 text-[9px] sm:text-xs w-[18%]">사용자</th>
-              <th className="border border-gray-600 p-1 text-[9px] sm:text-xs text-blue-300 w-[20.5%]">생활비</th>
-              <th className="border border-gray-600 p-1 text-[9px] sm:text-xs text-blue-300 w-[20.5%]">적금</th>
-              <th className="border border-gray-600 p-1 text-[9px] sm:text-xs text-blue-300 w-[20.5%]">투자</th>
-              <th className="border border-gray-600 p-1 text-[9px] sm:text-xs text-blue-300 w-[20.5%]">가족</th>
+              <th className="border border-gray-600 p-1 text-[10px] sm:text-xs w-[17%]">사용자</th>
+              <th className="border border-gray-600 p-1 text-[10px] sm:text-xs text-blue-300 w-[20.75%]">생활비</th>
+              <th className="border border-gray-600 p-1 text-[10px] sm:text-xs text-blue-300 w-[20.75%]">적금</th>
+              <th className="border border-gray-600 p-1 text-[10px] sm:text-xs text-blue-300 w-[20.75%]">투자</th>
+              <th className="border border-gray-600 p-1 text-[10px] sm:text-xs text-blue-300 w-[20.75%]">가족</th>
             </tr>
           </thead>
           <tbody>
             {userBudgets.map((budget, index) => (
               <tr key={index} className="text-center">
-                <td className={`border border-gray-600 p-1 font-bold text-[10px] sm:text-sm truncate ${budget.userId === 'bak' ? 'text-emerald-400' : 'text-red-400'}`}>
+                <td className={`border border-gray-600 p-0.5 font-bold text-[11px] sm:text-sm truncate ${budget.userId === 'bak' ? 'text-emerald-400' : 'text-red-400'}`}>
                   {budget.userId}
                 </td>
-                <td className="border border-gray-600 p-1 text-[9px] sm:text-xs break-all leading-tight">
-                  {budget.생활비.toLocaleString()}<span className="text-[7px] opacity-50 ml-0.5">원</span>
+                <td className="border border-gray-600 p-0.5 text-[10px] sm:text-xs tracking-tighter whitespace-nowrap leading-tight">
+                  {budget.생활비.toLocaleString()}<span className="text-[8px] opacity-40 ml-0.5">원</span>
                 </td>
-                <td className="border border-gray-600 p-1 text-[9px] sm:text-xs break-all leading-tight">
-                  {budget.적금.toLocaleString()}<span className="text-[7px] opacity-50 ml-0.5">원</span>
+                <td className="border border-gray-600 p-0.5 text-[10px] sm:text-xs tracking-tighter whitespace-nowrap leading-tight">
+                  {budget.적금.toLocaleString()}<span className="text-[8px] opacity-40 ml-0.5">원</span>
                 </td>
-                <td className="border border-gray-600 p-1 text-[9px] sm:text-xs break-all leading-tight">
-                  {budget.투자.toLocaleString()}<span className="text-[7px] opacity-50 ml-0.5">원</span>
+                <td className="border border-gray-600 p-0.5 text-[10px] sm:text-xs tracking-tighter whitespace-nowrap leading-tight">
+                  {budget.투자.toLocaleString()}<span className="text-[8px] opacity-40 ml-0.5">원</span>
                 </td>
-                <td className="border border-gray-600 p-1 text-[9px] sm:text-xs break-all leading-tight">
-                  {budget.가족.toLocaleString()}<span className="text-[7px] opacity-50 ml-0.5">원</span>
+                <td className="border border-gray-600 p-0.5 text-[10px] sm:text-xs tracking-tighter whitespace-nowrap leading-tight">
+                  {budget.가족.toLocaleString()}<span className="text-[8px] opacity-40 ml-0.5">원</span>
                 </td>
               </tr>
             ))}
