@@ -21,12 +21,15 @@ export default function ScheduleInput({ selectedRange, onRegister }: Props) {
 
   const sendNotification = async (text: string, dateInfo: string) => {
     try {
-      // 모든 가족 기기(family topic)에 알림 발송
+      // 날짜가 혹시 없더라도 기본값 보장
+      const safeDate = dateInfo || "일자미상";
+      const messageBody = `${userId || "가족"}님이 ${safeDate} [${text}] 일정을 등록했습니다.`;
+
       await axios.post("/api/notify", {
         title: "📅 새로운 일정 등록",
-        body: `${userId || "가족"}님이 ${dateInfo} [${text}] 일정을 등록했습니다.`,
+        body: messageBody,
       });
-      console.log("Broadcast notification sent to family topic");
+      console.log("Broadcast notification sent:", messageBody);
     } catch (err) {
       console.error("Failed to send notification:", err);
     }
@@ -45,10 +48,18 @@ export default function ScheduleInput({ selectedRange, onRegister }: Props) {
     const end = new Date(endDate);
     const dates: string[] = [];
 
-    // 알림용 날짜 텍스트 생성
-    const dateInfo = startDate.toDateString() === endDate.toDateString()
-      ? `${startDate.getMonth() + 1}월 ${startDate.getDate()}일`
-      : `${startDate.getMonth() + 1}/${startDate.getDate()} ~ ${endDate.getMonth() + 1}/${endDate.getDate()}`;
+    // 알림용 날짜 텍스트 생성 (확실하게 Date 객체로 변환 후 포맷팅)
+    const s = new Date(startDate);
+    const e = new Date(endDate);
+    const isSameDay = s.getFullYear() === e.getFullYear() &&
+                     s.getMonth() === e.getMonth() &&
+                     s.getDate() === e.getDate();
+
+    const dateInfo = isSameDay
+      ? `${s.getMonth() + 1}월 ${s.getDate()}일`
+      : `${s.getMonth() + 1}/${s.getDate()}~${e.getMonth() + 1}/${e.getDate()}`;
+
+    console.log("알림 전송 데이터:", { userId, dateInfo, content: content.trim() });
 
     while (start <= end) {
       const dateStr = start
