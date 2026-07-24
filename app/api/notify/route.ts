@@ -11,14 +11,24 @@ if (!getApps().length) {
     if (!serviceAccountKey) {
       initError = "FIREBASE_SERVICE_ACCOUNT_KEY is missing.";
     } else {
-      // 1. 먼저 JSON을 파싱합니다.
-      const cleanedKey = serviceAccountKey.trim().replace(/^'|'$/g, '');
+      serviceAccountKey = serviceAccountKey.trim();
+
+      // 1. 따옴표 제거 및 Base64 해독 시도
+      let cleanedKey = serviceAccountKey.replace(/^['"]|['"]$/g, '');
+
+      if (!cleanedKey.startsWith('{')) {
+        try {
+          cleanedKey = Buffer.from(cleanedKey, 'base64').toString('utf-8');
+        } catch (e) {}
+      }
+
       const serviceAccount = JSON.parse(cleanedKey);
 
-      // 2. 파싱된 객체 내부의 private_key에서 \\n을 실제 \n으로 바꿉니다.
-      // (JSON.parse 이후에 처리해야 'Bad control character' 에러가 나지 않습니다.)
+      // 2. 비밀키의 줄바꿈(\n)을 실제 줄바꿈으로 완벽하게 치환
       if (serviceAccount.private_key) {
-        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+        serviceAccount.private_key = serviceAccount.private_key
+          .replace(/\\n/g, '\n')
+          .replace(/\n/g, '\n');
       }
 
       initializeApp({
