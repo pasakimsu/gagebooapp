@@ -61,22 +61,27 @@ export async function POST(req: NextRequest) {
         body,
       },
       topic: "family",
-      // iOS 전용 설정 추가 (소리 및 우선순위)
+      // iOS 전용 설정 최적화
       apns: {
         payload: {
           aps: {
+            alert: {
+              title,
+              body,
+            },
             sound: "default",
             badge: 1,
-            contentAvailable: true,
+            // 'active' 상태가 아니어도 알림을 띄우도록 설정
+            interruptionLevel: "active" as const,
           },
         },
       },
-      // 안드로이드 전용 설정
+      // 안드로이드 전용 설정 최적화
       android: {
         priority: "high" as const,
         notification: {
           sound: "default",
-          clickAction: "TOP_STORY_ACTIVITY",
+          channelId: "family_channel",
         },
       },
     };

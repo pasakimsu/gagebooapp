@@ -11,9 +11,32 @@ export default function NotificationPermission() {
 
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
-      setPermission(Notification.permission);
+      const currentPermission = Notification.permission;
+      setPermission(currentPermission);
+
+      // 이미 허용된 상태라면 자동으로 토큰 확인 및 구독 유지
+      if (currentPermission === "granted") {
+        autoSubscribe();
+      }
     }
   }, []);
+
+  const autoSubscribe = async () => {
+    try {
+      if (!messaging) return;
+
+      const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+      if (!vapidKey) return;
+
+      const currentToken = await getToken(messaging, { vapidKey });
+      if (currentToken) {
+        console.log("자동 구독 확인 중...");
+        await axios.post("/api/subscribe", { token: currentToken });
+      }
+    } catch (e) {
+      console.error("자동 구독 확인 실패:", e);
+    }
+  };
 
   const requestPermission = async () => {
     setLoading(true);
@@ -21,6 +44,11 @@ export default function NotificationPermission() {
       if (typeof window === "undefined" || !("Notification" in window)) {
         alert("이 브라우저는 알림을 지원하지 않습니다.");
         return;
+      }
+
+      // 서비스 워커 명시적 등록 확인
+      if ("serviceWorker" in navigator) {
+        await navigator.serviceWorker.register("/firebase-messaging-sw.js");
       }
 
       if (!messaging) {
