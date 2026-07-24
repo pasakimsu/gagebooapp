@@ -162,12 +162,12 @@ export default function BudgetHomePage() {
               <AppStyleButton icon="💰" label="계산" onClick={() => router.push("/calcul")} />
               <AppStyleButton icon="📁" label="부조" onClick={() => router.push("/Donations")} />
               <AppStyleButton icon="🏦" label="대출" onClick={() => router.push("/loan")} />
+              <AppStyleButton icon="💸" label="지출" onClick={() => router.push("/expenses")} />
             </div>
 
             {/* ➡️ 우측 대시보드 메인 영역 (배경 제거하여 합침) */}
             <div className="flex-1 text-white py-2 min-h-[500px]">
               <p className="mb-6 font-bold text-lg sm:text-xl text-[#FFC90E] flex items-center gap-2">
-                <span className="text-2xl">👶</span>
                 서한이-{getDaysSinceReference("2025-01-13")}일째
               </p>
 
