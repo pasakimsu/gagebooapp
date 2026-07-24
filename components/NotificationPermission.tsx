@@ -58,9 +58,15 @@ export default function NotificationPermission() {
         return;
       }
 
-      // 서비스 워커 명시적 등록 확인
+      // 1. 서비스 워커 명시적 등록 및 대기 (iOS 필수)
+      let registration: ServiceWorkerRegistration;
       if ("serviceWorker" in navigator) {
-        await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+        registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+        // 서비스 워커가 준비될 때까지 잠시 대기
+        await navigator.serviceWorker.ready;
+      } else {
+        alert("서비스 워커를 지원하지 않는 브라우저입니다.");
+        return;
       }
 
       if (!messaging) {
@@ -79,12 +85,14 @@ export default function NotificationPermission() {
           return;
         }
 
+        // 2. 토큰 가져오기 (등록 객체를 명시적으로 전달)
         const currentToken = await getToken(messaging, {
           vapidKey: vapidKey,
+          serviceWorkerRegistration: registration
         });
 
         if (currentToken) {
-          console.log("FCM Token 획득 성공");
+          console.log("획득한 토큰:", currentToken);
           const userId = localStorage.getItem("userId") || "guest";
           const res = await axios.post<{ success: boolean }>("/api/subscribe", {
             token: currentToken,
@@ -92,10 +100,11 @@ export default function NotificationPermission() {
           });
 
           if (res.data.success) {
-            alert("✅ 기기 등록 완료! 이제 알림을 받으실 수 있습니다.");
+            alert("✅ 알림 설정 완료! 이제 앱을 끄고 PC에서 테스트해보세요.");
           }
         }
-      } else if (status === "denied") {
+      }
+else if (status === "denied") {
         alert("알림 권한이 거부되었습니다. 설정에서 직접 허용해 주세요.");
       }
     } catch (err) {
