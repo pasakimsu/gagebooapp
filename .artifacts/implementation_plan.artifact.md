@@ -1,65 +1,45 @@
-# 모바일 푸시 알림 및 PWA 기능 도입 계획
+# 모바일 푸시 알림 및 PWA 구현 계획 (v2: 전체 알림 방식)
 
-사용자와 배우자가 스마트폰 잠금화면에서 카카오톡처럼 알림을 받을 수 있도록 **Firebase Cloud Messaging(FCM)**과 **PWA(Progressive Web App)** 기술을 도입합니다.
+사용자와 배우자가 로그인 여부에 상관없이 스마트폰에서 실시간 일정 알림을 받을 수 있도록 **FCM Topic(주제) 구독** 방식을 도입합니다.
 
-## User Review Required
+## 주요 변경 사항 (업그레이드)
+
+### 1. 주제(Topic) 구독 방식 도입
+*   누구에게 보낼지(UserId) 계산하지 않고, `family`라는 주제에 가입된 모든 기기에 알림을 보냅니다.
+*   내가 등록해도 내 폰과 배우자 폰 모두 알림이 옵니다.
+
+### 2. 로그인 의존성 제거
+*   로그인하지 않은 상태에서도 앱을 열기만 하면 알림 권한을 요청하고 토큰을 서버에 등록합니다.
+
+---
+
+## 상세 수정 내역
+
+### [NotificationPermission 컴포넌트](file:///C:/Users/nalb/OneDrive/바탕 화면/최종본/myhome-web-main/components/NotificationPermission.tsx) [MODIFY]
+*   로그인 체크(`localStorage.getItem("userId")`) 로직을 제거합니다.
+*   권한 허용 즉시 FCM 토큰을 받아 새로 만들 `/api/subscribe` 엔드포인트로 전송합니다.
+
+### [/api/subscribe API](file:///C:/Users/nalb/OneDrive/바탕 화면/최종본/myhome-web-main/app/api/subscribe/route.ts) [NEW]
+*   받은 토큰을 Firebase Admin SDK의 `subscribeToTopic` 기능을 사용하여 `family` 주제에 강제로 가입시킵니다.
+
+### [/api/notify API](file:///C:/Users/nalb/OneDrive/바탕 화면/최종본/myhome-web-main/app/api/notify/route.ts) [MODIFY]
+*   특정 사용자의 토큰을 Firestore에서 찾지 않고, 바로 `topic: "family"`로 메시지를 발송합니다.
+*   Firestore 조회가 사라지므로 속도가 더 빨라지고 오류 가능성이 줄어듭니다.
+
+### [ScheduleInput 컴포넌트](file:///C:/Users/nalb/OneDrive/바탕 화면/최종본/myhome-web-main/app/schedule/components/ScheduleInput.tsx) [MODIFY]
+*   상대방 아이디를 계산하는 복잡한 로직을 지우고, 단순히 알림 내용만 서버로 보냅니다.
+
+---
+
+## 검증 계획
+
+### 수동 확인
+1.  **배포 후**: 스마트폰에서 앱에 접속 시 즉시 알림 권한 팝업이 뜨는지 확인.
+2.  **알림 확인**: 한 기기에서 일정 등록 시, 해당 기기 포함 모든 설치 기기에 알림이 오는지 확인.
+3.  **잠금 화면**: 폰 화면이 꺼진 상태에서도 카카오톡처럼 알림이 쌓이는지 확인.
 
 > [!IMPORTANT]
-> 푸시 알림 기능을 정상적으로 작동시키기 위해서는 다음 두 가지 설정이 반드시 필요합니다.
-> 1. **Firebase VAPID 키 생성**: Firebase 콘솔 -> 프로젝트 설정 -> 클라우드 메시징에서 '웹 푸시 인증'의 키를 생성하여 알려주셔야 합니다.
-> 2. **Firebase 서비스 계정 키**: 서버에서 알림을 보내기 위해 서비스 계정 JSON 파일이 필요합니다. Vercel 환경 변수에 설정하는 방법을 안내해 드릴 예정입니다.
-> 3. **PWA 아이콘**: 홈 화면에 설치했을 때 보일 앱 아이콘(192x192, 512x512) 이미지 파일이 있으면 좋습니다.
-
-## Proposed Changes
-
-### 1. PWA 설정 (Progressive Web App)
-웹사이트를 스마트폰에 앱처럼 설치할 수 있게 하여, 알림 수신율을 높이고 실제 앱과 같은 경험을 제공합니다.
-
-#### [NEW] [manifest.ts](file:///C:/Users/nalb/OneDrive/바탕 화면/최종본/myhome-web-main/app/manifest.ts)
-*   앱 이름, 아이콘, 배경색 등 PWA 설정 파일 생성.
-
-#### [MODIFY] [layout.tsx](file:///C:/Users/nalb/OneDrive/바탕 화면/최종본/myhome-web-main/app/layout.tsx)
-*   PWA 관련 메타태그(Theme Color 등) 추가.
-
----
-
-### 2. Firebase 메시징 연동
-브라우저와 백그라운드에서 알림을 수신하기 위한 설정을 진행합니다.
-
-#### [MODIFY] [firebase.ts](file:///C:/Users/nalb/OneDrive/바탕 화면/최종본/myhome-web-main/lib/firebase.ts)
-*   `getMessaging` 초기화 및 내보내기.
-
-#### [NEW] [firebase-messaging-sw.js](file:///C:/Users/nalb/OneDrive/바탕 화면/최종본/myhome-web-main/public/firebase-messaging-sw.js)
-*   앱이 꺼져있을 때(백그라운드) 알림을 받아 잠금화면에 표시해주는 서비스 워커 스크립트.
-
----
-
-### 3. 알림 권한 및 토큰 관리
-사용자의 기기 식별값(FCM 토큰)을 수집하여 Firestore에 저장합니다.
-
-#### [NEW] [NotificationPermission.tsx](file:///C:/Users/nalb/OneDrive/바탕 화면/최종본/myhome-web-main/components/NotificationPermission.tsx)
-*   사용자에게 알림 권한을 요청하고, 허용 시 토큰을 받아 `fcmTokens` 컬렉션에 저장하는 컴포넌트.
-
----
-
-### 4. 알림 전송 백엔드 (API)
-일정이 등록될 때 배우자의 기기로 알림을 쏘아주는 로직입니다.
-
-#### [NEW] [route.ts](file:///C:/Users/nalb/OneDrive/바탕 화면/최종본/myhome-web-main/app/api/notify/route.ts)
-*   Firebase Admin SDK를 사용하여 특정 사용자에게 알림을 전송하는 API 엔드포인트.
-
-#### [MODIFY] [ScheduleInput.tsx](file:///C:/Users/nalb/OneDrive/바탕 화면/최종본/myhome-web-main/app/schedule/components/ScheduleInput.tsx)
-*   일정 등록 완료 후, 상대방(배우자)에게 알림을 보내는 API 호출 로직 추가.
-
-## Verification Plan
-
-### Automated Tests
-*   `FCM 토큰 저장 확인`: 로그인 후 알림 권한 허용 시 Firestore `fcmTokens`에 데이터가 들어오는지 확인.
-*   `API 전송 테스트`: Postman이나 cURL을 통해 `/api/notify`로 테스트 메시지 발송.
-
-### Manual Verification
-*   **안드로이드/iOS**: 웹사이트 접속 후 '홈 화면에 추가'를 통해 설치한 뒤, 알림 권한을 허용하고 일정을 등록했을 때 실제 폰에서 알림이 오는지 확인.
-*   **잠금 화면**: 폰 화면을 끄고 알림이 왔을 때 스택 형태로 쌓이는지 확인.
+> 이 작업은 기존에 Vercel에 설정하신 환경 변수들을 그대로 사용합니다. 추가 설정은 필요 없으며, 제가 코드를 수정한 후 다시 Push만 하면 적용됩니다.
 
 ---
 

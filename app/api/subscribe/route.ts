@@ -19,31 +19,23 @@ if (!admin.apps.length) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { title, body } = await req.json();
+    const { token } = await req.json();
 
-    if (!title || !body) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    if (!token) {
+      return NextResponse.json({ error: "Missing token" }, { status: 400 });
     }
 
     if (!admin.apps.length) {
       return NextResponse.json({ error: "Firebase Admin not initialized" }, { status: 500 });
     }
 
-    // 'family' 주제를 구독한 모든 기기에 메시지 전송
-    const message = {
-      notification: {
-        title,
-        body,
-      },
-      topic: "family",
-    };
+    // 'family' 주제에 토큰 등록
+    const response = await admin.messaging().subscribeToTopic(token, "family");
+    console.log("Successfully subscribed to topic:", response);
 
-    const response = await admin.messaging().send(message);
-    console.log("Successfully sent topic message:", response);
-
-    return NextResponse.json({ success: true, messageId: response });
+    return NextResponse.json({ success: true, response });
   } catch (error) {
-    console.error("Error sending topic notification:", error);
+    console.error("Error subscribing to topic:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

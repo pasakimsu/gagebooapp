@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { db, collection, addDoc } from "@/lib/firebase";
+import axios from "axios";
 
 interface Props {
   selectedRange: [Date, Date];
@@ -16,6 +17,19 @@ export default function ScheduleInput({ selectedRange, onRegister }: Props) {
     const id = localStorage.getItem("userId");
     if (id) setUserId(id);
   }, []);
+
+  const sendNotification = async (text: string) => {
+    try {
+      // 모든 가족 기기(family topic)에 알림 발송
+      await axios.post("/api/notify", {
+        title: "📅 새로운 일정 등록",
+        body: `${userId || "가족"}님이 일정을 등록했습니다: ${text}`,
+      });
+      console.log("Broadcast notification sent to family topic");
+    } catch (err) {
+      console.error("Failed to send notification:", err);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!content.trim() || !userId) {
@@ -46,6 +60,9 @@ export default function ScheduleInput({ selectedRange, onRegister }: Props) {
           createdAt: new Date(),
         });
       }
+
+      // 알림 전송 (첫 번째 등록 건에 대해서만 알림 발송)
+      sendNotification(content.trim());
 
       alert("✅ 등록 완료!");
       setContent("");
