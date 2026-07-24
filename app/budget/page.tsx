@@ -150,39 +150,73 @@ export default function BudgetHomePage() {
   return (
     <AuthGuard>
       <div className="min-h-screen flex items-center justify-center bg-beigeDark px-4 transition-colors">
-        <div className="bg-[#2f2a25] p-8 rounded-xl shadow-md w-full max-w-md text-center">
-          <h2 className="text-2xl font-bold text-white mb-2">{userId}님 로그인했습니다 🎉</h2>
-          <div className="bg-[#3e352c] text-white p-4 rounded-md my-6 text-sm leading-relaxed shadow-inner text-left">
-            <p className="mb-2 font-bold text-lg border-b border-brownBorder pb-1">서한이-{getDaysSinceReference("2025-01-13")}일째 ({getMonthsSinceReference("2025-01-13")}개월)</p>
-            {weeklySchedules.length > 0 && (
-              <>
-                <p className="mt-4 font-semibold text-gray-400">이번주 일정</p>
-                <ul className="list-disc list-inside space-y-1">
-                  {groupSchedulesByContent(weeklySchedules).map((group, idx) => {
-                    const isSpecial = group[0].id.startsWith("lunar-") || group[0].id.startsWith("solar-");
-                    return <li key={idx} className={`font-bold ${isSpecial ? "text-[#FFC90E]" : "text-white"}`}>{formatRangeContent(group)}</li>;
-                  })}
-                </ul>
-              </>
-            )}
-            {monthlySchedules.length > 0 && (
-              <>
-                <p className="mt-4 font-semibold text-gray-400">이번달 일정</p>
-                <ul className="list-disc list-inside space-y-1">
-                  {groupSchedulesByContent(monthlySchedules).map((group, idx) => {
-                    const isSpecial = group[0].id.startsWith("lunar-") || group[0].id.startsWith("solar-");
-                    return <li key={idx} className={isSpecial ? "text-[#FFC90E] font-bold" : "text-white"}>{formatRangeContent(group)}</li>;
-                  })}
-                </ul>
-              </>
-            )}
-          </div>
+        <div className="bg-[#2f2a25] p-6 sm:p-8 rounded-2xl shadow-2xl w-full max-w-4xl border border-brownBorder/20">
+          <h2 className="text-2xl font-bold text-white mb-6 text-center sm:text-left border-b border-brownBorder/30 pb-4">
+            {userId}님 로그인했습니다 🎉
+          </h2>
 
-          <div className="flex justify-center gap-6">
-            <AppStyleButton icon="📅" label="일정" onClick={() => router.push("/schedule")} />
-            <AppStyleButton icon="💰" label="계산기" onClick={() => router.push("/calcul")} />
-            <AppStyleButton icon="📁" label="부조금" onClick={() => router.push("/Donations")} />
-            <AppStyleButton icon="🏦" label="대출" onClick={() => router.push("/loan")} />
+          <div className="flex flex-col md:flex-row gap-8">
+            {/* ⬅️ 좌측 메뉴 바 (세로 일렬) */}
+            <div className="flex md:flex-col justify-center md:justify-start gap-4 md:gap-8 bg-[#3e352c]/50 p-4 rounded-xl md:min-w-[120px]">
+              <AppStyleButton icon="📅" label="일정" onClick={() => router.push("/schedule")} />
+              <AppStyleButton icon="💰" label="계산기" onClick={() => router.push("/calcul")} />
+              <AppStyleButton icon="📁" label="부조금" onClick={() => router.push("/Donations")} />
+              <AppStyleButton icon="🏦" label="대출" onClick={() => router.push("/loan")} />
+            </div>
+
+            {/* ➡️ 우측 대시보드 메인 영역 (확장됨) */}
+            <div className="flex-1 bg-[#3e352c] text-white p-6 rounded-xl shadow-inner min-h-[400px]">
+              <p className="mb-4 font-bold text-xl border-b border-brownBorder/50 pb-2 text-[#FFC90E]">
+                서한이-{getDaysSinceReference("2025-01-13")}일째 ({getMonthsSinceReference("2025-01-13")}개월)
+              </p>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {weeklySchedules.length > 0 && (
+                  <div className="bg-[#2f2a25]/50 p-4 rounded-lg border border-brownBorder/20">
+                    <p className="mb-3 font-semibold text-gray-400 flex items-center gap-2">
+                      <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
+                      이번주 일정
+                    </p>
+                    <ul className="list-inside space-y-2 text-sm">
+                      {groupSchedulesByContent(weeklySchedules).map((group, idx) => {
+                        const isSpecial = group[0].id.startsWith("lunar-") || group[0].id.startsWith("solar-");
+                        return (
+                          <li key={idx} className={`font-bold py-1 border-b border-white/5 last:border-0 ${isSpecial ? "text-[#FFC90E]" : "text-white/90"}`}>
+                            {formatRangeContent(group)}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+
+                {monthlySchedules.length > 0 && (
+                  <div className="bg-[#2f2a25]/50 p-4 rounded-lg border border-brownBorder/20">
+                    <p className="mb-3 font-semibold text-gray-400 flex items-center gap-2">
+                      <span className="w-2 h-2 bg-emerald-400 rounded-full"></span>
+                      이번달 일정
+                    </p>
+                    <ul className="list-inside space-y-2 text-sm overflow-y-auto max-h-[300px] custom-scrollbar">
+                      {groupSchedulesByContent(monthlySchedules).map((group, idx) => {
+                        const isSpecial = group[0].id.startsWith("lunar-") || group[0].id.startsWith("solar-");
+                        return (
+                          <li key={idx} className={`py-1 border-b border-white/5 last:border-0 ${isSpecial ? "text-[#FFC90E] font-bold" : "text-white/90"}`}>
+                            {formatRangeContent(group)}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {weeklySchedules.length === 0 && monthlySchedules.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-2 opacity-50">
+                  <span className="text-4xl">📭</span>
+                  <p>등록된 일정이 없습니다.</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
