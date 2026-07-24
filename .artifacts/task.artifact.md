@@ -1,11 +1,12 @@
-# 알림 스위치 및 관리자 기능 구현 태스크 리스트
+# 계산기 UI 개선 구현 태스크 리스트
 
-- [ ] 알림 구독/해제 API 고도화
-    - [ ] `app/api/subscribe/route.ts`에서 `unsubscribe` 액션 처리 추가
-- [ ] NotificationPermission 컴포넌트 UI/UX 개편
-    - [ ] 계정별(`admin` vs 일반) 권한 분기 로직 추가
-    - [ ] Tailwind CSS를 이용한 세련된 토글 스위치 구현
-    - [ ] 스위치 조작 시 즉시 서버와 연동 (구독/해제)
-- [ ] 최종 테스트 및 배포
-    - [ ] `admin` 로그인 시 테스트 버튼 확인
-    - [ ] 일반 계정 로그인 시 스위치 작동 확인
+- [ ] 데이터 인터페이스 및 fetch 로직 확장
+    - [ ] `app/calcul/page.tsx`의 `Budget` 인터페이스 수정
+    - [ ] `fetchUserBudgets`에서 원본 데이터(allowance, salary) 필드 추가
+- [ ] 이중 테이블 UI 구현
+    - [ ] `app/calcul/components/BudgetComparisonTable.tsx` 수정
+    - [ ] 상단: 원천 데이터 테이블 추가 (5일 수당, 20일 월급, 합계)
+    - [ ] 하단: 기존 배분 결과 테이블 유지 및 레이아웃 조정
+- [ ] 실시간 데이터 연동 보완
+    - [ ] '계산하기' 버튼 클릭 시 즉시 하단 표에 반영되는지 확인
+- [ ] 디자인 및 폰트 일관성 점검

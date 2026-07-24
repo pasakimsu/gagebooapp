@@ -39,6 +39,9 @@ interface Budget {
   userId: string;
   year: string;
   month: string;
+  allowance: number;
+  salary: number;
+  totalSalary: number;
   생활비: number;
   적금: number;
   투자: number;
@@ -104,12 +107,38 @@ export default function CalculPage() {
 
   const handleCalculate = () => {
     if (totalSalary <= 0) return;
-    setAllocated({
+
+    const newAllocated = {
       생활비: Math.floor(totalSalary * 0.25),
       적금: Math.floor(totalSalary * 0.25),
       투자: Math.floor(totalSalary * 0.15),
       가족: Math.floor(totalSalary * 0.1),
-    });
+    };
+
+    setAllocated(newAllocated);
+
+    // 표에 실시간 반영 (현재 사용자 데이터 업데이트)
+    if (userId) {
+      const currentBudget: Budget = {
+        userId,
+        year,
+        month,
+        allowance: Number(allowance.replace(/,/g, "")),
+        salary: Number(salary.replace(/,/g, "")),
+        totalSalary,
+        ...newAllocated
+      };
+
+      setUserBudgets(prev => {
+        const existingIndex = prev.findIndex(b => b.userId === userId);
+        if (existingIndex > -1) {
+          const updated = [...prev];
+          updated[existingIndex] = currentBudget;
+          return updated;
+        }
+        return [...prev, currentBudget];
+      });
+    }
   };
 
   const handleSave = async () => {
@@ -151,6 +180,9 @@ export default function CalculPage() {
           userId: doc.data().userId,
           year: doc.data().year,
           month: doc.data().month,
+          allowance: doc.data().allowance || 0,
+          salary: doc.data().salary || 0,
+          totalSalary: doc.data().totalSalary || 0,
           생활비: doc.data().allocations?.생활비 || 0,
           적금: doc.data().allocations?.적금 || 0,
           투자: doc.data().allocations?.투자 || 0,
