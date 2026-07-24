@@ -1,12 +1,13 @@
-# 계산기 UI 개선 구현 태스크 리스트
+# 표 가독성 개선 및 확대 기능 구현 태스크 리스트
 
-- [ ] 데이터 인터페이스 및 fetch 로직 확장
-    - [ ] `app/calcul/page.tsx`의 `Budget` 인터페이스 수정
-    - [ ] `fetchUserBudgets`에서 원본 데이터(allowance, salary) 필드 추가
-- [ ] 이중 테이블 UI 구현
-    - [ ] `app/calcul/components/BudgetComparisonTable.tsx` 수정
-    - [ ] 상단: 원천 데이터 테이블 추가 (5일 수당, 20일 월급, 합계)
-    - [ ] 하단: 기존 배분 결과 테이블 유지 및 레이아웃 조정
-- [ ] 실시간 데이터 연동 보완
-    - [ ] '계산하기' 버튼 클릭 시 즉시 하단 표에 반영되는지 확인
-- [ ] 디자인 및 폰트 일관성 점검
+- [x] 라이브러리 설치
+    - [x] `react-zoom-pan-pinch` 설치
+- [x] 브라우저 줌 제한 해제
+    - [x] `app/layout.tsx`의 viewport 메타데이터 수정
+- [x] 표 디자인 초슬림화 및 줌 기능 적용
+    - [x] `app/calcul/components/BudgetComparisonTable.tsx` 수정
+    - [x] 여백 최소화 및 글자 크기 상향 (`12px`)
+    - [x] `TransformWrapper`를 이용한 확대/축소 제스처 적용
+- [ ] 최종 테스트 및 배포
+    - [ ] 모바일 기기에서 핀치-투-줌 작동 확인
+    - [ ] 가로 스크롤 없이 가독성 확인
