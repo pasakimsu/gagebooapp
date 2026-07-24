@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import admin from "firebase-admin";
+import { getApps, initializeApp, cert } from "firebase-admin/app";
+import { getMessaging } from "firebase-admin/messaging";
 
-if (!admin.apps.length) {
+if (!getApps().length) {
   try {
-    const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
-      ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
-      : null;
+    const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    const serviceAccount = serviceAccountKey ? JSON.parse(serviceAccountKey) : null;
 
     if (serviceAccount) {
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
+      initializeApp({
+        credential: cert(serviceAccount),
       });
     }
   } catch (error) {
@@ -25,12 +25,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing token" }, { status: 400 });
     }
 
-    if (!admin.apps.length) {
+    if (!getApps().length) {
       return NextResponse.json({ error: "Firebase Admin not initialized" }, { status: 500 });
     }
 
     // 'family' 주제에 토큰 등록
-    const response = await admin.messaging().subscribeToTopic(token, "family");
+    const response = await getMessaging().subscribeToTopic(token, "family");
     console.log("Successfully subscribed to topic:", response);
 
     return NextResponse.json({ success: true, response });
