@@ -2,11 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getApps, initializeApp, cert } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
 
+let initError: string | null = null;
+
 if (!getApps().length) {
   try {
     let serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
-    if (serviceAccountKey) {
+    if (!serviceAccountKey) {
+      initError = "FIREBASE_SERVICE_ACCOUNT_KEY is missing.";
+    } else {
       const formattedKey = serviceAccountKey.trim()
         .replace(/^'|'$/g, '')
         .replace(/\\n/g, '\n');
@@ -17,6 +21,7 @@ if (!getApps().length) {
       });
     }
   } catch (error: any) {
+    initError = `Init error: ${error.message}`;
     console.error("Firebase Admin initialization error:", error.message);
   }
 }
@@ -31,7 +36,8 @@ export async function POST(req: NextRequest) {
 
     if (!getApps().length) {
       return NextResponse.json({
-        error: "Firebase Admin not initialized."
+        error: "Firebase Admin not initialized.",
+        details: initError || "Unknown initialization failure"
       }, { status: 500 });
     }
 
