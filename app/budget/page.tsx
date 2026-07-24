@@ -149,39 +149,41 @@ export default function BudgetHomePage() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen flex items-center justify-center bg-beigeDark px-4 transition-colors">
-        <div className="bg-[#2f2a25] p-6 sm:p-8 rounded-2xl shadow-2xl w-full max-w-4xl border border-brownBorder/20">
-          <h2 className="text-2xl font-bold text-white mb-6 text-center sm:text-left border-b border-brownBorder/30 pb-4">
+      <div className="min-h-screen flex items-start sm:items-center justify-center bg-beigeDark px-2 sm:px-4 py-4 transition-colors">
+        <div className="bg-[#2f2a25] p-4 sm:p-8 rounded-2xl shadow-2xl w-full max-w-5xl border border-brownBorder/20">
+          <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6 text-center sm:text-left border-b border-brownBorder/30 pb-4">
             {userId}님 로그인했습니다 🎉
           </h2>
 
-          <div className="flex flex-row gap-4 sm:gap-8">
-            {/* ⬅️ 좌측 메뉴 바 (모바일에서도 세로 유지) */}
-            <div className="flex flex-col justify-start gap-4 sm:gap-6 bg-[#3e352c]/50 p-2 sm:p-4 rounded-xl min-w-[70px] sm:min-w-[120px]">
+          <div className="flex flex-row gap-2 sm:gap-8">
+            {/* ⬅️ 좌측 메뉴 바 (배경 제거하여 합침) */}
+            <div className="flex flex-col justify-start gap-4 sm:gap-6 py-2 min-w-[65px] sm:min-w-[120px] border-r border-brownBorder/20 pr-2 sm:pr-8">
               <AppStyleButton icon="📅" label="일정" onClick={() => router.push("/schedule")} />
               <AppStyleButton icon="💰" label="계산" onClick={() => router.push("/calcul")} />
               <AppStyleButton icon="📁" label="부조" onClick={() => router.push("/Donations")} />
               <AppStyleButton icon="🏦" label="대출" onClick={() => router.push("/loan")} />
             </div>
 
-            {/* ➡️ 우측 대시보드 메인 영역 (더 길고 넓게 확장) */}
-            <div className="flex-1 bg-[#3e352c] text-white p-4 sm:p-6 rounded-xl shadow-inner min-h-[500px]">
-              <p className="mb-4 font-bold text-lg sm:text-xl border-b border-brownBorder/50 pb-2 text-[#FFC90E]">
+            {/* ➡️ 우측 대시보드 메인 영역 (배경 제거하여 합침) */}
+            <div className="flex-1 text-white py-2 min-h-[500px]">
+              <p className="mb-6 font-bold text-lg sm:text-xl text-[#FFC90E] flex items-center gap-2">
+                <span className="text-2xl">👶</span>
                 서한이-{getDaysSinceReference("2025-01-13")}일째
               </p>
 
-              <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-8">
                 {weeklySchedules.length > 0 && (
-                  <div className="bg-[#2f2a25]/50 p-3 sm:p-4 rounded-lg border border-brownBorder/20">
-                    <p className="mb-2 font-semibold text-gray-400 text-xs sm:text-sm flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 bg-blue-400 rounded-full"></span>
-                      이번주
+                  <div>
+                    <p className="mb-3 font-semibold text-gray-400 text-xs sm:text-sm flex items-center gap-2 uppercase tracking-wider">
+                      <span className="w-1.5 h-1.5 bg-blue-400 rounded-full shadow-[0_0_8px_#60a5fa]"></span>
+                      이번주 일정
                     </p>
-                    <ul className="space-y-1.5 text-[11px] sm:text-sm">
+                    <ul className="space-y-2 text-[12px] sm:text-base ml-2">
                       {groupSchedulesByContent(weeklySchedules).map((group, idx) => {
                         const isSpecial = group[0].id.startsWith("lunar-") || group[0].id.startsWith("solar-");
                         return (
-                          <li key={idx} className={`font-bold leading-tight ${isSpecial ? "text-[#FFC90E]" : "text-white/90"}`}>
+                          <li key={idx} className={`font-bold leading-tight flex items-start gap-2 ${isSpecial ? "text-[#FFC90E]" : "text-white/95"}`}>
+                            <span className="opacity-50">•</span>
                             {formatRangeContent(group)}
                           </li>
                         );
@@ -191,16 +193,17 @@ export default function BudgetHomePage() {
                 )}
 
                 {monthlySchedules.length > 0 && (
-                  <div className="bg-[#2f2a25]/50 p-3 sm:p-4 rounded-lg border border-brownBorder/20">
-                    <p className="mb-2 font-semibold text-gray-400 text-xs sm:text-sm flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
-                      이번달
+                  <div className="pt-4 border-t border-white/5">
+                    <p className="mb-3 font-semibold text-gray-400 text-xs sm:text-sm flex items-center gap-2 uppercase tracking-wider">
+                      <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full shadow-[0_0_8px_#34d399]"></span>
+                      이번달 일정
                     </p>
-                    <ul className="space-y-1.5 text-[11px] sm:text-sm overflow-y-auto max-h-[400px] custom-scrollbar">
+                    <ul className="space-y-2 text-[12px] sm:text-base ml-2 overflow-y-auto max-h-[500px] custom-scrollbar pr-2">
                       {groupSchedulesByContent(monthlySchedules).map((group, idx) => {
                         const isSpecial = group[0].id.startsWith("lunar-") || group[0].id.startsWith("solar-");
                         return (
-                          <li key={idx} className={`leading-tight ${isSpecial ? "text-[#FFC90E] font-bold" : "text-white/85"}`}>
+                          <li key={idx} className={`leading-tight flex items-start gap-2 ${isSpecial ? "text-[#FFC90E] font-bold" : "text-white/85"}`}>
+                            <span className="opacity-50">•</span>
                             {formatRangeContent(group)}
                           </li>
                         );
