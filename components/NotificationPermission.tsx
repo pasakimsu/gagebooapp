@@ -46,6 +46,20 @@ export default function NotificationPermission() {
         if (currentToken) {
           console.log("FCM Token 획득 성공");
           await axios.post("/api/subscribe", { token: currentToken });
+
+          // Firestore에도 저장 (사용자가 확인할 수 있도록)
+          try {
+            const { db, doc, setDoc } = await import("@/lib/firebase");
+            const userId = localStorage.getItem("userId") || "guest";
+            await setDoc(doc(db, "fcmTokens", `${userId}_${currentToken.substring(0, 10)}`), {
+              token: currentToken,
+              updatedAt: new Date(),
+              topic: "family"
+            });
+          } catch (e) {
+            console.error("Firestore 토큰 저장 실패:", e);
+          }
+
           alert("✅ 알림 구독이 완료되었습니다!");
         }
       } else if (status === "denied") {
@@ -59,23 +73,25 @@ export default function NotificationPermission() {
     }
   };
 
-  // 이미 허용되었거나 거부된 경우 버튼을 숨김
-  if (permission !== "default") return null;
+  // 권한이 거부된 경우 아무것도 표시하지 않음
+  if (permission === "denied") return null;
 
   return (
     <div className="w-full max-w-md mb-6 p-4 bg-blue-900/30 border border-blue-500 rounded-lg text-center">
-      <p className="text-sm mb-3 text-blue-100">
-        📅 새로운 일정을 실시간으로 받아보시겠습니까?
-      </p>
-      <button
-        onClick={requestPermission}
-        disabled={loading}
-        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition duration-300 shadow-lg active:scale-95"
-      >
-        {loading ? "설정 중..." : "🔔 실시간 알림 켜기"}
-      </button>
-
-      {permission === "granted" && (
+      {permission === "default" ? (
+        <>
+          <p className="text-sm mb-3 text-blue-100">
+            📅 새로운 일정을 실시간으로 받아보시겠습니까?
+          </p>
+          <button
+            onClick={requestPermission}
+            disabled={loading}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition duration-300 shadow-lg active:scale-95"
+          >
+            {loading ? "설정 중..." : "🔔 실시간 알림 켜기"}
+          </button>
+        </>
+      ) : permission === "granted" ? (
         <button
           onClick={async () => {
             try {
@@ -88,11 +104,12 @@ export default function NotificationPermission() {
               alert("알림 전송 실패");
             }
           }}
-          className="mt-4 text-xs text-blue-300 underline block w-full"
+          className="text-sm text-blue-300 hover:text-blue-100 flex items-center justify-center gap-2 mx-auto"
         >
-          전송 테스트 해보기
+          <span>✅ 알림 구독 중</span>
+          <span className="underline text-xs">(전송 테스트)</span>
         </button>
-      )}
+      ) : null}
     </div>
   );
 }
