@@ -24,7 +24,8 @@ export default function NotificationPermission() {
     if (messaging) {
       const unsubscribe = onMessage(messaging, (payload) => {
         console.log("Foreground message:", payload);
-        alert(`🔔 [알림] ${payload.notification?.title}\n\n${payload.notification?.body}`);
+        // alert 제거 -> 콘솔 로그만 남기거나 필요시 작은 UI 토스트 알림으로 대체 가능
+        // 지금은 안정성을 위해 콘솔 로그만 유지
       });
       return () => unsubscribe();
     }
@@ -134,28 +135,31 @@ else if (status === "denied") {
           </button>
         </>
       ) : permission === "granted" ? (
-        <button
-          onClick={async () => {
-            try {
-              const res = await axios.post<{ success: boolean }>("/api/notify", {
-                title: "🔔 테스트 알림",
-                body: "알림이 정상적으로 작동합니다!",
-              });
-              if (res.data.success) {
-                alert("테스트 알림을 보냈습니다. 앱을 끄고 기다려 보세요.");
+        <div className="flex flex-col items-center">
+          <button
+            onClick={async () => {
+              try {
+                const res = await axios.post<{ success: boolean }>("/api/notify", {
+                  title: "🔔 테스트 알림",
+                  body: "알림이 정상적으로 작동합니다!",
+                });
+                if (res.data.success) {
+                  // 알림 전송 후 안내 문구만 변경
+                  setDebugInfo("테스트 알림을 보냈습니다. 즉시 앱을 종료하고 확인하세요.");
+                  setTimeout(() => setDebugInfo(""), 5000);
+                }
+              } catch (e: any) {
+                const errorMsg = e.response?.data?.error || "알림 전송 실패";
+                alert(`❌ ${errorMsg}`);
               }
-            } catch (e: any) {
-              const errorMsg = e.response?.data?.error || "알림 전송 실패";
-              const details = e.response?.data?.details || "";
-              alert(`❌ ${errorMsg}\n${details}`);
-              console.error("Test notification failed:", e.response?.data);
-            }
-          }}
-          className="text-sm text-blue-300 hover:text-blue-100 flex items-center justify-center gap-2 mx-auto"
-        >
-          <span>✅ 알림 구독 중</span>
-          <span className="underline text-xs">(전송 테스트)</span>
-        </button>
+            }}
+            className="text-sm text-blue-300 hover:text-blue-100 flex items-center justify-center gap-2 mx-auto"
+          >
+            <span>✅ 알림 구독 중</span>
+            <span className="underline text-xs">(전송 테스트)</span>
+          </button>
+          {debugInfo && <p className="mt-2 text-xs text-yellow-300 animate-pulse">{debugInfo}</p>}
+        </div>
       ) : null}
     </div>
   );

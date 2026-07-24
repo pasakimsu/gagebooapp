@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
         body,
       },
       topic: "family",
-      // iOS 전용 설정 최적화
+      // iOS 사파리 PWA 최적화 설정
       apns: {
         payload: {
           aps: {
@@ -71,12 +71,30 @@ export async function POST(req: NextRequest) {
             },
             sound: "default",
             badge: 1,
-            // 'active' 상태가 아니어도 알림을 띄우도록 설정
-            interruptionLevel: "active" as const,
+            // iOS에서 백그라운드 수신 확률을 높이는 핵심 설정
+            mutableContent: true,
+            contentAvailable: true,
+            interruptionLevel: "time-sensitive" as const,
           },
         },
       },
-      // 안드로이드 전용 설정 최적화
+      // 웹 푸시 공통 설정
+      webpush: {
+        headers: {
+          Urgency: "high",
+        },
+        notification: {
+          title,
+          body,
+          icon: "/next.svg",
+          badge: "/next.svg",
+          tag: "family-notification",
+          requireInteraction: true,
+        },
+        fcmOptions: {
+          link: "/",
+        },
+      },
       android: {
         priority: "high" as const,
         notification: {
