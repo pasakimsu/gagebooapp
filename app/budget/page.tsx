@@ -155,33 +155,33 @@ export default function BudgetHomePage() {
             {userId}님 로그인했습니다 🎉
           </h2>
 
-          <div className="flex flex-col md:flex-row gap-8">
-            {/* ⬅️ 좌측 메뉴 바 (세로 일렬) */}
-            <div className="flex md:flex-col justify-center md:justify-start gap-4 md:gap-8 bg-[#3e352c]/50 p-4 rounded-xl md:min-w-[120px]">
+          <div className="flex flex-row gap-4 sm:gap-8">
+            {/* ⬅️ 좌측 메뉴 바 (모바일에서도 세로 유지) */}
+            <div className="flex flex-col justify-start gap-4 sm:gap-6 bg-[#3e352c]/50 p-2 sm:p-4 rounded-xl min-w-[70px] sm:min-w-[120px]">
               <AppStyleButton icon="📅" label="일정" onClick={() => router.push("/schedule")} />
-              <AppStyleButton icon="💰" label="계산기" onClick={() => router.push("/calcul")} />
-              <AppStyleButton icon="📁" label="부조금" onClick={() => router.push("/Donations")} />
+              <AppStyleButton icon="💰" label="계산" onClick={() => router.push("/calcul")} />
+              <AppStyleButton icon="📁" label="부조" onClick={() => router.push("/Donations")} />
               <AppStyleButton icon="🏦" label="대출" onClick={() => router.push("/loan")} />
             </div>
 
-            {/* ➡️ 우측 대시보드 메인 영역 (확장됨) */}
-            <div className="flex-1 bg-[#3e352c] text-white p-6 rounded-xl shadow-inner min-h-[400px]">
-              <p className="mb-4 font-bold text-xl border-b border-brownBorder/50 pb-2 text-[#FFC90E]">
-                서한이-{getDaysSinceReference("2025-01-13")}일째 ({getMonthsSinceReference("2025-01-13")}개월)
+            {/* ➡️ 우측 대시보드 메인 영역 (더 길고 넓게 확장) */}
+            <div className="flex-1 bg-[#3e352c] text-white p-4 sm:p-6 rounded-xl shadow-inner min-h-[500px]">
+              <p className="mb-4 font-bold text-lg sm:text-xl border-b border-brownBorder/50 pb-2 text-[#FFC90E]">
+                서한이-{getDaysSinceReference("2025-01-13")}일째
               </p>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="flex flex-col gap-6">
                 {weeklySchedules.length > 0 && (
-                  <div className="bg-[#2f2a25]/50 p-4 rounded-lg border border-brownBorder/20">
-                    <p className="mb-3 font-semibold text-gray-400 flex items-center gap-2">
-                      <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
-                      이번주 일정
+                  <div className="bg-[#2f2a25]/50 p-3 sm:p-4 rounded-lg border border-brownBorder/20">
+                    <p className="mb-2 font-semibold text-gray-400 text-xs sm:text-sm flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-blue-400 rounded-full"></span>
+                      이번주
                     </p>
-                    <ul className="list-inside space-y-2 text-sm">
+                    <ul className="space-y-1.5 text-[11px] sm:text-sm">
                       {groupSchedulesByContent(weeklySchedules).map((group, idx) => {
                         const isSpecial = group[0].id.startsWith("lunar-") || group[0].id.startsWith("solar-");
                         return (
-                          <li key={idx} className={`font-bold py-1 border-b border-white/5 last:border-0 ${isSpecial ? "text-[#FFC90E]" : "text-white/90"}`}>
+                          <li key={idx} className={`font-bold leading-tight ${isSpecial ? "text-[#FFC90E]" : "text-white/90"}`}>
                             {formatRangeContent(group)}
                           </li>
                         );
@@ -191,16 +191,16 @@ export default function BudgetHomePage() {
                 )}
 
                 {monthlySchedules.length > 0 && (
-                  <div className="bg-[#2f2a25]/50 p-4 rounded-lg border border-brownBorder/20">
-                    <p className="mb-3 font-semibold text-gray-400 flex items-center gap-2">
-                      <span className="w-2 h-2 bg-emerald-400 rounded-full"></span>
-                      이번달 일정
+                  <div className="bg-[#2f2a25]/50 p-3 sm:p-4 rounded-lg border border-brownBorder/20">
+                    <p className="mb-2 font-semibold text-gray-400 text-xs sm:text-sm flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
+                      이번달
                     </p>
-                    <ul className="list-inside space-y-2 text-sm overflow-y-auto max-h-[300px] custom-scrollbar">
+                    <ul className="space-y-1.5 text-[11px] sm:text-sm overflow-y-auto max-h-[400px] custom-scrollbar">
                       {groupSchedulesByContent(monthlySchedules).map((group, idx) => {
                         const isSpecial = group[0].id.startsWith("lunar-") || group[0].id.startsWith("solar-");
                         return (
-                          <li key={idx} className={`py-1 border-b border-white/5 last:border-0 ${isSpecial ? "text-[#FFC90E] font-bold" : "text-white/90"}`}>
+                          <li key={idx} className={`leading-tight ${isSpecial ? "text-[#FFC90E] font-bold" : "text-white/85"}`}>
                             {formatRangeContent(group)}
                           </li>
                         );
