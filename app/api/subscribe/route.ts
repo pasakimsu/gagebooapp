@@ -7,18 +7,17 @@ if (!getApps().length) {
     let serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
     if (serviceAccountKey) {
-      serviceAccountKey = serviceAccountKey.trim();
-      if (serviceAccountKey.startsWith("'") && serviceAccountKey.endsWith("'")) {
-        serviceAccountKey = serviceAccountKey.slice(1, -1);
-      }
+      const formattedKey = serviceAccountKey.trim()
+        .replace(/^'|'$/g, '')
+        .replace(/\\n/g, '\n');
 
-      const serviceAccount = JSON.parse(serviceAccountKey);
+      const serviceAccount = JSON.parse(formattedKey);
       initializeApp({
         credential: cert(serviceAccount),
       });
     }
-  } catch (error) {
-    console.error("Firebase Admin initialization error:", error);
+  } catch (error: any) {
+    console.error("Firebase Admin initialization error:", error.message);
   }
 }
 
@@ -31,7 +30,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (!getApps().length) {
-      return NextResponse.json({ error: "Firebase Admin not initialized" }, { status: 500 });
+      return NextResponse.json({
+        error: "Firebase Admin not initialized."
+      }, { status: 500 });
     }
 
     // 'family' 주제에 토큰 등록
@@ -39,8 +40,11 @@ export async function POST(req: NextRequest) {
     console.log("Successfully subscribed to topic:", response);
 
     return NextResponse.json({ success: true, response });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error subscribing to topic:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({
+      error: "Subscription failed",
+      details: error.message
+    }, { status: 500 });
   }
 }

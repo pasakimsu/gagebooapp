@@ -7,20 +7,19 @@ if (!getApps().length) {
     let serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
     if (serviceAccountKey) {
-      // 혹시 앞뒤에 따옴표가 붙어있으면 제거
-      serviceAccountKey = serviceAccountKey.trim();
-      if (serviceAccountKey.startsWith("'") && serviceAccountKey.endsWith("'")) {
-        serviceAccountKey = serviceAccountKey.slice(1, -1);
-      }
+      // JSON 내부에 실제 줄바꿈 문자가 \n 문자열로 들어있는 경우 처리
+      const formattedKey = serviceAccountKey.trim()
+        .replace(/^'|'$/g, '') // 앞뒤 작은따옴표 제거
+        .replace(/\\n/g, '\n'); // \n 문자열을 실제 줄바꿈으로 변환
 
-      const serviceAccount = JSON.parse(serviceAccountKey);
+      const serviceAccount = JSON.parse(formattedKey);
       initializeApp({
         credential: cert(serviceAccount),
       });
       console.log("Firebase Admin Initialized successfully");
     }
-  } catch (error) {
-    console.error("Firebase Admin initialization error:", error);
+  } catch (error: any) {
+    console.error("Firebase Admin initialization error:", error.message);
   }
 }
 
@@ -33,7 +32,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (!getApps().length) {
-      return NextResponse.json({ error: "Firebase Admin not initialized" }, { status: 500 });
+      return NextResponse.json({
+        error: "Firebase Admin not initialized. Check your FIREBASE_SERVICE_ACCOUNT_KEY."
+      }, { status: 500 });
     }
 
     // 'family' 주제를 구독한 모든 기기에 메시지 전송
@@ -67,8 +68,11 @@ export async function POST(req: NextRequest) {
     console.log("Successfully sent topic message:", response);
 
     return NextResponse.json({ success: true, messageId: response });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error sending topic notification:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({
+      error: "Failed to send notification",
+      details: error.message
+    }, { status: 500 });
   }
 }

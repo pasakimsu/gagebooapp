@@ -95,13 +95,18 @@ export default function NotificationPermission() {
         <button
           onClick={async () => {
             try {
-              await axios.post("/api/notify", {
+              const res = await axios.post("/api/notify", {
                 title: "🔔 테스트 알림",
                 body: "알림이 정상적으로 작동합니다!",
               });
-              alert("테스트 알림을 보냈습니다. 앱을 끄고 기다려 보세요.");
-            } catch (e) {
-              alert("알림 전송 실패");
+              if (res.data.success) {
+                alert("테스트 알림을 보냈습니다. 앱을 끄고 기다려 보세요.");
+              }
+            } catch (e: any) {
+              const errorMsg = e.response?.data?.error || "알림 전송 실패";
+              const details = e.response?.data?.details || "";
+              alert(`❌ ${errorMsg}\n${details}`);
+              console.error("Test notification failed:", e.response?.data);
             }
           }}
           className="text-sm text-blue-300 hover:text-blue-100 flex items-center justify-center gap-2 mx-auto"
