@@ -85,7 +85,6 @@ export default function BudgetComparisonTable({ userBudgets }: { userBudgets: Bu
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-center text-[10px] text-gray-500 italic">💡 화면을 두 손가락으로 벌려 확대할 수 있습니다.</p>
     </div>
   );
 }
