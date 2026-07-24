@@ -6,43 +6,32 @@ let initError: string | null = null;
 
 if (!getApps().length) {
   try {
-    let serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-    if (!serviceAccountKey) {
-      initError = "FIREBASE_SERVICE_ACCOUNT_KEY is missing.";
-    } else {
-      let rawData = serviceAccountKey.trim().replace(/^['"]|['"]$/g, '');
-      let jsonString = "";
-
-      // 1. Base64 판별 및 디코딩
-      if (!rawData.startsWith('{')) {
-        try {
-          jsonString = Buffer.from(rawData, 'base64').toString('utf-8');
-          console.log("Decoded Base64 Service Account Key");
-        } catch (e) {
-          jsonString = rawData; // Base64 아니면 원본 사용
-        }
-      } else {
-        jsonString = rawData;
-      }
-
-      // 2. JSON 파싱
-      const serviceAccount = JSON.parse(jsonString);
-
-      // 3. 필수 필드 존재 확인
-      if (!serviceAccount.project_id || !serviceAccount.private_key || !serviceAccount.client_email) {
-        throw new Error("Missing required fields in Service Account JSON (project_id, private_key, client_email)");
-      }
-
-      // 4. 비밀키 줄바꿈 보정 (가장 확실한 방법)
-      serviceAccount.private_key = serviceAccount.private_key
-        .replace(/\\n/g, '\n')
-        .replace(/\n/g, '\n');
-
+    if (projectId && clientEmail && privateKey) {
       initializeApp({
-        credential: cert(serviceAccount),
+        credential: cert({
+          projectId,
+          clientEmail,
+          // Vercel 환경 변수에서 줄바꿈이 깨지는 경우를 대비한 보정
+          privateKey: privateKey.replace(/\\n/g, '\n'),
+        }),
       });
-      console.log("Firebase Admin Initialized successfully");
+      console.log("Firebase Admin Initialized with individual variables");
+    } else {
+      // 구버전(JSON 방식) 하위 호환성 유지
+      let serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+      if (serviceAccountKey) {
+        let rawData = serviceAccountKey.trim().replace(/^['"]|['"]$/g, '');
+        let jsonString = rawData.startsWith('{') ? rawData : Buffer.from(rawData, 'base64').toString('utf-8');
+        const serviceAccount = JSON.parse(jsonString);
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+        initializeApp({ credential: cert(serviceAccount) });
+      } else {
+        initError = "Firebase environment variables are missing.";
+      }
     }
   } catch (error: any) {
     initError = `Init error: ${error.message}`;

@@ -6,35 +6,27 @@ let initError: string | null = null;
 
 if (!getApps().length) {
   try {
-    let serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-    if (!serviceAccountKey) {
-      initError = "FIREBASE_SERVICE_ACCOUNT_KEY is missing.";
-    } else {
-      let rawData = serviceAccountKey.trim().replace(/^['"]|['"]$/g, '');
-      let jsonString = "";
-
-      if (!rawData.startsWith('{')) {
-        try {
-          jsonString = Buffer.from(rawData, 'base64').toString('utf-8');
-        } catch (e) {
-          jsonString = rawData;
-        }
-      } else {
-        jsonString = rawData;
-      }
-
-      const serviceAccount = JSON.parse(jsonString);
-
-      if (serviceAccount.private_key) {
-        serviceAccount.private_key = serviceAccount.private_key
-          .replace(/\\n/g, '\n')
-          .replace(/\n/g, '\n');
-      }
-
+    if (projectId && clientEmail && privateKey) {
       initializeApp({
-        credential: cert(serviceAccount),
+        credential: cert({
+          projectId,
+          clientEmail,
+          privateKey: privateKey.replace(/\\n/g, '\n'),
+        }),
       });
+    } else {
+      let serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+      if (serviceAccountKey) {
+        let rawData = serviceAccountKey.trim().replace(/^['"]|['"]$/g, '');
+        let jsonString = rawData.startsWith('{') ? rawData : Buffer.from(rawData, 'base64').toString('utf-8');
+        const serviceAccount = JSON.parse(jsonString);
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+        initializeApp({ credential: cert(serviceAccount) });
+      }
     }
   } catch (error: any) {
     initError = `Init error: ${error.message}`;
