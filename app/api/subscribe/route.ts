@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApps, initializeApp, cert } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
+import { getFirestore } from "firebase-admin/firestore";
 
 let initError: string | null = null;
 
@@ -29,36 +30,36 @@ if (!getApps().length) {
       }
     }
   } catch (error: any) {
-    initError = `Init error: ${error.message}`;
-    console.error("Firebase Admin initialization error:", error.message);
+    initError = error.message;
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { token } = await req.json();
+    const { token, userId } = await req.json();
 
-    if (!token) {
-      return NextResponse.json({ error: "Missing token" }, { status: 400 });
-    }
+    if (!token) return NextResponse.json({ error: "Missing token" }, { status: 400 });
+    if (!getApps().length) return NextResponse.json({ error: "Init failed", details: initError }, { status: 500 });
 
-    if (!getApps().length) {
-      return NextResponse.json({
-        error: "Firebase Admin not initialized.",
-        details: initError || "Unknown initialization failure"
-      }, { status: 500 });
-    }
+    const db = getFirestore();
+    const messaging = getMessaging();
 
-    // 'family' 주제에 토큰 등록
-    const response = await getMessaging().subscribeToTopic(token, "family");
-    console.log("Successfully subscribed to topic:", response);
+    // 1. 'family' 주제에 기기 등록
+    await messaging.subscribeToTopic(token, "family");
 
-    return NextResponse.json({ success: true, response });
+    // 2. Firestore에 토큰 정보 기록 (확인용)
+    const docId = `${userId || 'unknown'}_${token.substring(0, 8)}`;
+    await db.collection("fcmTokens").doc(docId).set({
+      token,
+      userId: userId || "guest",
+      platform: "ios/pwa",
+      updatedAt: new Date(),
+    });
+
+    console.log(`Token registered and saved: ${docId}`);
+    return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error("Error subscribing to topic:", error);
-    return NextResponse.json({
-      error: "Subscription failed",
-      details: error.message
-    }, { status: 500 });
+    console.error("Subscription error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

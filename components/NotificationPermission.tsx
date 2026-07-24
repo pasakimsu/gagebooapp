@@ -73,22 +73,15 @@ export default function NotificationPermission() {
 
         if (currentToken) {
           console.log("FCM Token 획득 성공");
-          await axios.post<{ success: boolean }>("/api/subscribe", { token: currentToken });
+          const userId = localStorage.getItem("userId") || "guest";
+          const res = await axios.post<{ success: boolean }>("/api/subscribe", {
+            token: currentToken,
+            userId
+          });
 
-          // Firestore에도 저장 (사용자가 확인할 수 있도록)
-          try {
-            const { db, doc, setDoc } = await import("@/lib/firebase");
-            const userId = localStorage.getItem("userId") || "guest";
-            await setDoc(doc(db, "fcmTokens", `${userId}_${currentToken.substring(0, 10)}`), {
-              token: currentToken,
-              updatedAt: new Date(),
-              topic: "family"
-            });
-          } catch (e) {
-            console.error("Firestore 토큰 저장 실패:", e);
+          if (res.data.success) {
+            alert("✅ 기기 등록 완료! 이제 알림을 받으실 수 있습니다.");
           }
-
-          alert("✅ 알림 구독이 완료되었습니다!");
         }
       } else if (status === "denied") {
         alert("알림 권한이 거부되었습니다. 설정에서 직접 허용해 주세요.");
