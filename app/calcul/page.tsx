@@ -176,18 +176,25 @@ export default function CalculPage() {
     try {
       const querySnapshot = await getDocs(collection(db, "budgets"));
       const budgets = querySnapshot.docs
-        .map((doc) => ({
-          userId: doc.data().userId,
-          year: doc.data().year,
-          month: doc.data().month,
-          allowance: doc.data().allowance || 0,
-          salary: doc.data().salary || 0,
-          totalSalary: doc.data().totalSalary || 0,
-          생활비: doc.data().allocations?.생활비 || 0,
-          적금: doc.data().allocations?.적금 || 0,
-          투자: doc.data().allocations?.투자 || 0,
-          가족: doc.data().allocations?.가족 || 0,
-        }))
+        .map((doc) => {
+          const data = doc.data();
+          // 데이터 타입에 상관없이 문자열로 변환하여 비교 준비
+          const dYear = String(data.year);
+          const dMonth = String(data.month).padStart(2, "0");
+
+          return {
+            userId: data.userId,
+            year: dYear,
+            month: dMonth,
+            allowance: data.allowance || 0,
+            salary: data.salary || 0,
+            totalSalary: data.totalSalary || (data.allowance || 0) + (data.salary || 0),
+            생활비: data.allocations?.생활비 || 0,
+            적금: data.allocations?.적금 || 0,
+            투자: data.allocations?.투자 || 0,
+            가족: data.allocations?.가족 || 0,
+          };
+        })
         .filter((data) => data.year === year && data.month === month);
 
       setUserBudgets(budgets);
