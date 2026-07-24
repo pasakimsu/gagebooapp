@@ -135,7 +135,7 @@ export default function CalendarView({
                 : s.id.startsWith("solar-")
                 ? "text-blue-500"
                 : s.content.includes("(bak)")
-                ? "text-black"
+                ? "text-emerald-600"
                 : s.content.includes("(yong)")
                 ? "text-red-500"
                 : "text-blue-500"

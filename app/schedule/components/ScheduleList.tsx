@@ -170,7 +170,7 @@ export default function ScheduleList({ selectedRange, refreshKey, onRefresh }: P
                 : item.id.startsWith("solar-")
                 ? "text-blue-400"
                 : item.content.includes("(bak)")
-                ? "text-black"
+                ? "text-emerald-400"
                 : item.content.includes("(yong)")
                 ? "text-red-400"
                 : "text-white"
