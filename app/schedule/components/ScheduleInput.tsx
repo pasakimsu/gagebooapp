@@ -70,12 +70,16 @@ export default function ScheduleInput({ selectedRange, onRegister }: Props) {
     }
 
     try {
+      // 0. 그룹 ID 생성 (여러 날짜 일정을 하나로 묶기 위함)
+      const groupId = Date.now().toString() + Math.random().toString(36).substring(2, 7);
+
       // 1. DB 저장을 먼저 병렬로 처리하여 속도 향상
       const savePromises = dates.map(date =>
         addDoc(collection(db, "schedules"), {
           date,
           content: `${content.trim()} (${userId})`,
           userId,
+          groupId, // 그룹 ID 추가
           createdAt: new Date(),
         })
       );

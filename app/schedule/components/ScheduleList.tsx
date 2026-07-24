@@ -14,6 +14,7 @@ interface ScheduleData {
   id: string;
   date: string;
   content: string;
+  groupId?: string;
 }
 
 const SOLAR_ANNIVERSARIES: Record<string, string> = {
@@ -47,7 +48,11 @@ const LUNAR_ANNIVERSARIES: Record<string, string[]> = {
 
 export default function ScheduleList({ selectedRange, refreshKey, onRefresh }: Props) {
   const [schedules, setSchedules] = useState<ScheduleData[]>([]);
+  const [allDbSchedules, setAllDbSchedules] = useState<ScheduleData[]>([]);
   const [loading, setLoading] = useState(false);
+  const [toDelete, setToDelete] = useState<ScheduleData | null>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [confirmMessage, setConfirmConfirmMessage] = useState("");
 
   const getStandardDateStr = (date: Date) => {
     const y = date.getFullYear();
@@ -69,6 +74,7 @@ export default function ScheduleList({ selectedRange, refreshKey, onRefresh }: P
         id: doc.id,
         ...(doc.data() as Omit<ScheduleData, "id">),
       }));
+      setAllDbSchedules(dbData);
 
       const [startDate, endDate] = selectedRange;
       const rangeDates: string[] = [];
@@ -79,89 +85,68 @@ export default function ScheduleList({ selectedRange, refreshKey, onRefresh }: P
         current.setDate(current.getDate() + 1);
       }
 
-      // 선택된 범위 내의 일정 필터링
       const filtered = dbData.filter((s) => rangeDates.includes(s.date));
 
-      // 기념일 추가 로직 (선택된 범위 내의 모든 날짜에 대해)
       const currentAnniv = new Date(startDate);
       while (currentAnniv <= endDate) {
         const std = getStandardDateStr(currentAnniv);
         const mmDd = std.slice(5);
-
         if (SOLAR_ANNIVERSARIES[mmDd]) {
-          filtered.push({
-            id: `solar-${std}`,
-            date: std,
-            content: SOLAR_ANNIVERSARIES[mmDd]
-          });
+          filtered.push({ id: `solar-${std}`, date: std, content: SOLAR_ANNIVERSARIES[mmDd] });
         }
         if (LUNAR_ANNIVERSARIES[std]) {
           LUNAR_ANNIVERSARIES[std].forEach((content, i) => {
-            filtered.push({
-              id: `lunar-${std}-${i}`,
-              date: std,
-              content
-            });
+            filtered.push({ id: `lunar-${std}-${i}`, date: std, content });
           });
         }
         currentAnniv.setDate(currentAnniv.getDate() + 1);
       }
-
       setSchedules(filtered);
     });
-
     return () => unsubscribe();
   }, [selectedRange, refreshKey]);
 
-  const handleBulkDelete = async () => {
-    const [startDate, endDate] = selectedRange;
-    const s = new Date(startDate);
-    const e = new Date(endDate);
-    const isSameDay = s.toDateString() === e.toDateString();
-
-    const dateInfo = isSameDay
-      ? `${s.getMonth() + 1}월 ${s.getDate()}일`
-      : `${s.getMonth() + 1}/${s.getDate()} ~ ${e.getMonth() + 1}/${e.getDate()}`;
-
-    if (!confirm(`⚠️ ${dateInfo} 기간의 모든 일정을 삭제하시겠습니까?`)) {
+  const handleDeleteClick = (item: ScheduleData) => {
+    if (item.id.startsWith("lunar-") || item.id.startsWith("solar-")) {
+      alert("⚠️ 자동 등록된 기념일은 삭제할 수 없습니다.");
       return;
     }
 
+    setToDelete(item);
+
+    // 그룹화된 일정이 있는지 확인 (본인 제외)
+    if (item.groupId) {
+      const relatedCount = allDbSchedules.filter(s => s.groupId === item.groupId).length;
+      if (relatedCount > 1) {
+        setConfirmConfirmMessage("다른 기간에 일정이 포함되어 있습니다. 전부 삭제 됩니다. 정말 삭제하시겠습니까?");
+      } else {
+        setConfirmConfirmMessage("정말 삭제하시겠습니까?");
+      }
+    } else {
+      setConfirmConfirmMessage("정말 삭제하시겠습니까?");
+    }
+    setShowConfirm(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!toDelete) return;
     setLoading(true);
     try {
-      const rangeDates: string[] = [];
-      const current = new Date(startDate);
-      while (current <= endDate) {
-        rangeDates.push(getStandardDateStr(current));
-        rangeDates.push(getOldDateStr(current));
-        current.setDate(current.getDate() + 1);
+      if (toDelete.groupId) {
+        const related = allDbSchedules.filter(s => s.groupId === toDelete.groupId);
+        const deletePromises = related.map(s => deleteDoc(doc(db, "schedules", s.id)));
+        await Promise.all(deletePromises);
+      } else {
+        await deleteDoc(doc(db, "schedules", toDelete.id));
       }
-
-      const schedulesRef = collection(db, "schedules");
-      const q = query(schedulesRef, where("date", "in", rangeDates.slice(0, 10))); // query 'in' limit is 10
-
-      // 'in' 쿼리는 최대 10개까지만 가능하므로, 안전하게 전체 데이터를 가져와서 필터링하거나 루프를 돕니다.
-      // 여기서는 성능과 안정성을 위해 기존의 루프 방식을 유지하되 최적화합니다.
-      const snapshot = await getDocs(schedulesRef);
-      const toDelete = snapshot.docs.filter(doc => rangeDates.includes(doc.data().date));
-
-      const deletePromises = toDelete.map(d => deleteDoc(doc(db, "schedules", d.id)));
-      await Promise.all(deletePromises);
-
-      // 알림 전송 (비동기)
-      const userId = localStorage.getItem("userId");
-      axios.post("/api/notify", {
-        title: "🗑️ 일정 일괄 삭제",
-        body: `${userId || "가족"}님이 ${dateInfo} 기간의 일정을 삭제했습니다.`,
-      }).catch(console.error);
-
-      alert("✅ 삭제가 완료되었습니다.");
       onRefresh();
     } catch (error) {
       console.error(error);
       alert("❌ 삭제 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
+      setShowConfirm(false);
+      setToDelete(null);
     }
   };
 
@@ -179,7 +164,7 @@ export default function ScheduleList({ selectedRange, refreshKey, onRefresh }: P
       <ul className="space-y-2 mb-4">
         {schedules.map((item) => (
           <li key={item.id} className="flex justify-between items-center bg-[#3a312a] p-3 rounded-xl shadow-sm border border-brownBorder/30">
-            <span className={`truncate font-bold ${
+            <span className={`truncate flex-1 font-bold ${
               item.id.startsWith("lunar-")
                 ? "text-[#FFC90E]"
                 : item.id.startsWith("solar-")
@@ -192,19 +177,41 @@ export default function ScheduleList({ selectedRange, refreshKey, onRefresh }: P
             }`}>
               {item.content}
             </span>
+            {!item.id.startsWith("lunar-") && !item.id.startsWith("solar-") && (
+              <button
+                onClick={() => handleDeleteClick(item)}
+                className="w-1/8 ml-2 bg-red-700/90 hover:bg-red-600 text-white text-[10px] px-2 py-1.5 rounded-lg transition shadow-md font-bold active:scale-95"
+              >
+                삭제
+              </button>
+            )}
           </li>
         ))}
       </ul>
 
-      <button
-        onClick={handleBulkDelete}
-        disabled={loading}
-        className={`w-full font-bold py-3 rounded-xl transition-all duration-200 active:scale-95 shadow-md ${
-          loading ? "bg-gray-500 cursor-not-allowed" : "bg-red-700/90 hover:bg-red-600 text-white"
-        }`}
-      >
-        {loading ? "삭제 중..." : "일정 삭제"}
-      </button>
+      {showConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 backdrop-blur-sm">
+          <div className="bg-[#2f2a25] text-white p-6 rounded-2xl shadow-2xl text-center w-80 border border-brownBorder">
+            <p className="mb-6 font-bold leading-relaxed whitespace-pre-wrap">{confirmMessage}</p>
+            <div className="flex justify-center gap-3">
+              <button
+                onClick={handleConfirmDelete}
+                disabled={loading}
+                className="bg-red-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-red-700 shadow-md active:scale-95 disabled:opacity-50"
+              >
+                {loading ? "삭제 중" : "예"}
+              </button>
+              <button
+                onClick={() => setShowConfirm(false)}
+                disabled={loading}
+                className="bg-gray-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-gray-500 shadow-md active:scale-95 disabled:opacity-50"
+              >
+                아니오
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
