@@ -11,12 +11,10 @@ if (!getApps().length) {
     if (!serviceAccountKey) {
       initError = "FIREBASE_SERVICE_ACCOUNT_KEY is missing.";
     } else {
-      // JSON 내부에 실제 줄바꿈 문자가 \n 문자열로 들어있는 경우 처리
-      const formattedKey = serviceAccountKey.trim()
-        .replace(/^'|'$/g, '') // 앞뒤 작은따옴표 제거
-        .replace(/\\n/g, '\n'); // \n 문자열을 실제 줄바꿈으로 변환
+      // 불필요한 공백이나 따옴표만 제거하고 바로 파싱
+      const cleanedKey = serviceAccountKey.trim().replace(/^'|'$/g, '');
+      const serviceAccount = JSON.parse(cleanedKey);
 
-      const serviceAccount = JSON.parse(formattedKey);
       initializeApp({
         credential: cert(serviceAccount),
       });

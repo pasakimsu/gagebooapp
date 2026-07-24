@@ -11,11 +11,9 @@ if (!getApps().length) {
     if (!serviceAccountKey) {
       initError = "FIREBASE_SERVICE_ACCOUNT_KEY is missing.";
     } else {
-      const formattedKey = serviceAccountKey.trim()
-        .replace(/^'|'$/g, '')
-        .replace(/\\n/g, '\n');
+      const cleanedKey = serviceAccountKey.trim().replace(/^'|'$/g, '');
+      const serviceAccount = JSON.parse(cleanedKey);
 
-      const serviceAccount = JSON.parse(formattedKey);
       initializeApp({
         credential: cert(serviceAccount),
       });
