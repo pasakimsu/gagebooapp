@@ -36,28 +36,36 @@ if (!getApps().length) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { token, userId } = await req.json();
+    const { token, userId, action } = await req.json();
 
     if (!token) return NextResponse.json({ error: "Missing token" }, { status: 400 });
     if (!getApps().length) return NextResponse.json({ error: "Init failed", details: initError }, { status: 500 });
 
     const db = getFirestore();
     const messaging = getMessaging();
+    const isSubscribe = action !== "unsubscribe";
 
-    // 1. 'family' 주제에 기기 등록
-    await messaging.subscribeToTopic(token, "family");
+    if (isSubscribe) {
+      // 1. 'family' 주제에 기기 등록
+      await messaging.subscribeToTopic(token, "family");
+      console.log(`Token subscribed to topic: ${token.substring(0, 8)}`);
+    } else {
+      // 2. 'family' 주제에서 기기 해제
+      await messaging.unsubscribeFromTopic(token, "family");
+      console.log(`Token unsubscribed from topic: ${token.substring(0, 8)}`);
+    }
 
-    // 2. Firestore에 토큰 정보 기록 (확인용)
+    // 3. Firestore에 상태 기록
     const docId = `${userId || 'unknown'}_${token.substring(0, 8)}`;
     await db.collection("fcmTokens").doc(docId).set({
       token,
       userId: userId || "guest",
       platform: "ios/pwa",
+      subscribed: isSubscribe,
       updatedAt: new Date(),
     });
 
-    console.log(`Token registered and saved: ${docId}`);
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, subscribed: isSubscribe });
   } catch (error: any) {
     console.error("Subscription error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

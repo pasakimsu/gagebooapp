@@ -9,17 +9,23 @@ export default function NotificationPermission() {
   const [permission, setPermission] = useState<string>("default");
   const [loading, setLoading] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string>("");
+  const [isSubscribed, setIsSubscribed] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
+    const id = localStorage.getItem("userId");
+    setUserId(id);
+
     if (typeof window !== "undefined" && "Notification" in window) {
       const currentPermission = Notification.permission;
       setPermission(currentPermission);
 
-      // 이미 허용된 상태라면 자동으로 토큰 확인 및 구독 유지
       if (currentPermission === "granted") {
         autoSubscribe();
       }
     }
+
+    // ... existing onMessage listener ...
 
     // 🔔 앱이 켜져 있을 때(포그라운드) 알림 수신 처리
     if (messaging) {
@@ -40,11 +46,13 @@ export default function NotificationPermission() {
 
       const currentToken = await getToken(messaging, { vapidKey });
       if (currentToken) {
-        // 서버에 구독 및 Firestore 저장 요청
-        await axios.post("/api/subscribe", {
+        const res = await axios.post<{ success: boolean; subscribed: boolean }>("/api/subscribe", {
           token: currentToken,
           userId: localStorage.getItem("userId") || "guest"
         });
+        if (res.data.success) {
+          setIsSubscribed(res.data.subscribed);
+        }
       }
     } catch (e) {
       console.error("자동 구독 확인 실패:", e);
@@ -85,13 +93,14 @@ export default function NotificationPermission() {
           if (currentToken) {
             console.log("획득한 토큰:", currentToken);
             const userId = localStorage.getItem("userId") || "guest";
-            const res = await axios.post<{ success: boolean }>("/api/subscribe", {
+            const res = await axios.post<{ success: boolean; subscribed: boolean }>("/api/subscribe", {
               token: currentToken,
               userId
             });
 
             if (res.data.success) {
-              alert("✅ 알림 설정 완료! 이제 앱을 끄고 PC에서 테스트해보세요.");
+              setIsSubscribed(res.data.subscribed);
+              alert("✅ 알림 설정이 완료되었습니다!");
             }
           }
         } else if (status === "denied") {
@@ -108,48 +117,99 @@ export default function NotificationPermission() {
     }
   };
 
+  const toggleSubscription = async () => {
+    setLoading(true);
+    try {
+      if (!messaging) return;
+      const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+      const currentToken = await getToken(messaging, { vapidKey });
+
+      if (currentToken) {
+        const nextState = !isSubscribed;
+        const res = await axios.post<{ success: boolean; subscribed: boolean }>("/api/subscribe", {
+          token: currentToken,
+          userId,
+          action: nextState ? "subscribe" : "unsubscribe"
+        });
+
+        if (res.data.success) {
+          setIsSubscribed(res.data.subscribed);
+          alert(res.data.subscribed ? "🔔 알림이 켜졌습니다." : "🔕 알림이 꺼졌습니다.");
+        }
+      }
+    } catch (e) {
+      alert("알림 설정 변경에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 권한이 거부된 경우 아무것도 표시하지 않음
   if (permission === "denied") return null;
 
   return (
-    <div className="w-full max-w-md mb-6 p-4 bg-blue-900/30 border border-blue-500 rounded-lg text-center">
+    <div className="w-full max-w-md mb-6 p-4 bg-blue-900/20 border border-blue-500/30 rounded-xl text-center shadow-inner">
       {permission === "default" ? (
         <>
-          <p className="text-sm mb-3 text-blue-100">
-            📅 새로운 일정을 실시간으로 받아보시겠습니까?
+          <p className="text-sm mb-3 text-blue-100/80">
+            📅 실시간 일정 알림을 받으시겠습니까?
           </p>
           <button
             onClick={requestPermission}
             disabled={loading}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition duration-300 shadow-lg active:scale-95"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-8 rounded-full transition duration-300 shadow-lg active:scale-95 disabled:opacity-50"
           >
-            {loading ? "설정 중..." : "🔔 실시간 알림 켜기"}
+            {loading ? "설정 중..." : "🔔 알림 권한 허용하기"}
           </button>
         </>
       ) : permission === "granted" ? (
-        <div className="flex flex-col items-center">
-          <button
-            onClick={async () => {
-              try {
-                const res = await axios.post<{ success: boolean }>("/api/notify", {
-                  title: "🔔 테스트 알림",
-                  body: "알림이 정상적으로 작동합니다!",
-                });
-                if (res.data.success) {
-                  setDebugInfo("테스트 알림을 보냈습니다. 즉시 앱을 종료하고 확인하세요.");
-                  setTimeout(() => setDebugInfo(""), 5000);
-                }
-              } catch (e: any) {
-                const errorMsg = e.response?.data?.error || "알림 전송 실패";
-                alert(`❌ ${errorMsg}`);
-              }
-            }}
-            className="text-sm text-blue-300 hover:text-blue-100 flex items-center justify-center gap-2 mx-auto"
-          >
-            <span>✅ 알림 구독 중</span>
-            <span className="underline text-xs">(전송 테스트)</span>
-          </button>
-          {debugInfo && <p className="mt-2 text-xs text-yellow-300 animate-pulse">{debugInfo}</p>}
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex items-center justify-between w-full px-4">
+            <span className="text-sm font-medium text-blue-100">
+              {isSubscribed ? "🔔 실시간 알림 수신 중" : "🔕 알림 수신 꺼짐"}
+            </span>
+
+            {/* 세련된 토글 스위치 */}
+            <button
+              onClick={toggleSubscription}
+              disabled={loading}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                isSubscribed ? "bg-blue-500" : "bg-gray-600"
+              } ${loading ? "opacity-50 cursor-wait" : "cursor-pointer"}`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  isSubscribed ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* 관리자(admin) 전용 테스트 버튼 */}
+          {userId === "admin" && (
+            <div className="w-full pt-2 border-t border-blue-500/20 mt-1">
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await axios.post<{ success: boolean }>("/api/notify", {
+                      title: "🔔 [관리자 테스트]",
+                      body: "시스템 알림이 정상 작동 중입니다.",
+                    });
+                    if (res.data.success) {
+                      setDebugInfo("테스트 알림 발송 성공! 앱을 끄고 확인하세요.");
+                      setTimeout(() => setDebugInfo(""), 5000);
+                    }
+                  } catch (e: any) {
+                    alert(`❌ 전송 실패: ${e.response?.data?.error || "알 수 없는 오류"}`);
+                  }
+                }}
+                className="text-xs text-blue-300 hover:text-blue-100 underline decoration-dotted underline-offset-4"
+              >
+                관리자 전송 테스트
+              </button>
+              {debugInfo && <p className="mt-2 text-[10px] text-yellow-300 animate-pulse">{debugInfo}</p>}
+            </div>
+          )}
         </div>
       ) : null}
     </div>
