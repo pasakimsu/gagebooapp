@@ -1,11 +1,10 @@
-# 모바일 푸시 알림 및 PWA 구현 태스크 리스트 (v2: Topic 방식)
+# 일정 일괄 삭제 기능 구현 태스크 리스트
 
-- [x] PWA 관련 파일 설정
-    - [x] `app/manifest.ts` 생성
-    - [x] `app/layout.tsx` 메타데이터 수정
-- [/] FCM Topic 기반 알림 시스템 구축
-    - [ ] `components/NotificationPermission.tsx` 수정 (로그인 체크 제거, 구독 호출)
-    - [ ] `app/api/subscribe/route.ts` 신규 생성 (Topic 구독 API)
-    - [ ] `app/api/notify/route.ts` 수정 (Topic 발송 방식)
-    - [ ] `app/schedule/components/ScheduleInput.tsx` 수정 (전체 알림 발송)
-- [ ] 최종 검증 및 배포 안내
+- [x] 일정 일괄 삭제 로직 및 UI 구현
+    - [x] `app/schedule/components/ScheduleInput.tsx`에 일괄 삭제 버튼 추가
+    - [x] 날짜 범위를 순회하며 일정을 삭제하는 `handleBulkDelete` 함수 구현
+    - [x] 삭제 확인 컨펌 로직 추가
+- [ ] 기능 검증
+    - [ ] 특정 범위 선택 후 일괄 삭제 시 해당 날짜 일정만 사라지는지 확인
+    - [ ] 자동 등록 기념일은 유지되는지 확인
+- [ ] 최종 배포 및 안내
