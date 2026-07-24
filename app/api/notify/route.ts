@@ -11,9 +11,15 @@ if (!getApps().length) {
     if (!serviceAccountKey) {
       initError = "FIREBASE_SERVICE_ACCOUNT_KEY is missing.";
     } else {
-      // 불필요한 공백이나 따옴표만 제거하고 바로 파싱
+      // 1. 먼저 JSON을 파싱합니다.
       const cleanedKey = serviceAccountKey.trim().replace(/^'|'$/g, '');
       const serviceAccount = JSON.parse(cleanedKey);
+
+      // 2. 파싱된 객체 내부의 private_key에서 \\n을 실제 \n으로 바꿉니다.
+      // (JSON.parse 이후에 처리해야 'Bad control character' 에러가 나지 않습니다.)
+      if (serviceAccount.private_key) {
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+      }
 
       initializeApp({
         credential: cert(serviceAccount),

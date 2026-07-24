@@ -14,6 +14,10 @@ if (!getApps().length) {
       const cleanedKey = serviceAccountKey.trim().replace(/^'|'$/g, '');
       const serviceAccount = JSON.parse(cleanedKey);
 
+      if (serviceAccount.private_key) {
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+      }
+
       initializeApp({
         credential: cert(serviceAccount),
       });
