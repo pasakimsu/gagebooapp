@@ -11,16 +11,20 @@ if (!getApps().length) {
     if (!serviceAccountKey) {
       initError = "FIREBASE_SERVICE_ACCOUNT_KEY is missing.";
     } else {
-      serviceAccountKey = serviceAccountKey.trim();
-      let cleanedKey = serviceAccountKey.replace(/^['"]|['"]$/g, '');
+      let rawData = serviceAccountKey.trim().replace(/^['"]|['"]$/g, '');
+      let jsonString = "";
 
-      if (!cleanedKey.startsWith('{')) {
+      if (!rawData.startsWith('{')) {
         try {
-          cleanedKey = Buffer.from(cleanedKey, 'base64').toString('utf-8');
-        } catch (e) {}
+          jsonString = Buffer.from(rawData, 'base64').toString('utf-8');
+        } catch (e) {
+          jsonString = rawData;
+        }
+      } else {
+        jsonString = rawData;
       }
 
-      const serviceAccount = JSON.parse(cleanedKey);
+      const serviceAccount = JSON.parse(jsonString);
 
       if (serviceAccount.private_key) {
         serviceAccount.private_key = serviceAccount.private_key

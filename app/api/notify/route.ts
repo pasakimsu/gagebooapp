@@ -11,25 +11,33 @@ if (!getApps().length) {
     if (!serviceAccountKey) {
       initError = "FIREBASE_SERVICE_ACCOUNT_KEY is missing.";
     } else {
-      serviceAccountKey = serviceAccountKey.trim();
+      let rawData = serviceAccountKey.trim().replace(/^['"]|['"]$/g, '');
+      let jsonString = "";
 
-      // 1. 따옴표 제거 및 Base64 해독 시도
-      let cleanedKey = serviceAccountKey.replace(/^['"]|['"]$/g, '');
-
-      if (!cleanedKey.startsWith('{')) {
+      // 1. Base64 판별 및 디코딩
+      if (!rawData.startsWith('{')) {
         try {
-          cleanedKey = Buffer.from(cleanedKey, 'base64').toString('utf-8');
-        } catch (e) {}
+          jsonString = Buffer.from(rawData, 'base64').toString('utf-8');
+          console.log("Decoded Base64 Service Account Key");
+        } catch (e) {
+          jsonString = rawData; // Base64 아니면 원본 사용
+        }
+      } else {
+        jsonString = rawData;
       }
 
-      const serviceAccount = JSON.parse(cleanedKey);
+      // 2. JSON 파싱
+      const serviceAccount = JSON.parse(jsonString);
 
-      // 2. 비밀키의 줄바꿈(\n)을 실제 줄바꿈으로 완벽하게 치환
-      if (serviceAccount.private_key) {
-        serviceAccount.private_key = serviceAccount.private_key
-          .replace(/\\n/g, '\n')
-          .replace(/\n/g, '\n');
+      // 3. 필수 필드 존재 확인
+      if (!serviceAccount.project_id || !serviceAccount.private_key || !serviceAccount.client_email) {
+        throw new Error("Missing required fields in Service Account JSON (project_id, private_key, client_email)");
       }
+
+      // 4. 비밀키 줄바꿈 보정 (가장 확실한 방법)
+      serviceAccount.private_key = serviceAccount.private_key
+        .replace(/\\n/g, '\n')
+        .replace(/\n/g, '\n');
 
       initializeApp({
         credential: cert(serviceAccount),
