@@ -12,18 +12,19 @@ interface Props {
 export default function ScheduleInput({ selectedRange, onRegister }: Props) {
   const [userId, setUserId] = useState<string | null>(null);
   const [content, setContent] = useState<string>("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const id = localStorage.getItem("userId");
     if (id) setUserId(id);
   }, []);
 
-  const sendNotification = async (text: string) => {
+  const sendNotification = async (text: string, dateInfo: string) => {
     try {
       // 모든 가족 기기(family topic)에 알림 발송
       await axios.post("/api/notify", {
         title: "📅 새로운 일정 등록",
-        body: `${userId || "가족"}님이 일정을 등록했습니다: ${text}`,
+        body: `${userId || "가족"}님이 ${dateInfo} [${text}] 일정을 등록했습니다.`,
       });
       console.log("Broadcast notification sent to family topic");
     } catch (err) {
@@ -37,10 +38,17 @@ export default function ScheduleInput({ selectedRange, onRegister }: Props) {
       return;
     }
 
+    setLoading(true); // 중복 클릭 방지 시작
+
     const [startDate, endDate] = selectedRange;
     const start = new Date(startDate);
     const end = new Date(endDate);
     const dates: string[] = [];
+
+    // 알림용 날짜 텍스트 생성
+    const dateInfo = startDate.toDateString() === endDate.toDateString()
+      ? `${startDate.getMonth() + 1}월 ${startDate.getDate()}일`
+      : `${startDate.getMonth() + 1}/${startDate.getDate()} ~ ${endDate.getMonth() + 1}/${endDate.getDate()}`;
 
     while (start <= end) {
       const dateStr = start
@@ -55,14 +63,14 @@ export default function ScheduleInput({ selectedRange, onRegister }: Props) {
       for (const date of dates) {
         await addDoc(collection(db, "schedules"), {
           date,
-          content: `${content.trim()} (${userId})`, // ✅ 날짜 없는 내용만 저장
+          content: `${content.trim()} (${userId})`,
           userId,
           createdAt: new Date(),
         });
       }
 
-      // 알림 전송 (첫 번째 등록 건에 대해서만 알림 발송)
-      sendNotification(content.trim());
+      // 알림 전송 (상세 정보 포함)
+      await sendNotification(content.trim(), dateInfo);
 
       alert("✅ 등록 완료!");
       setContent("");
@@ -70,6 +78,8 @@ export default function ScheduleInput({ selectedRange, onRegister }: Props) {
     } catch (err) {
       console.error("❌ 등록 오류:", err);
       alert("❌ 등록 중 문제가 발생했습니다.");
+    } finally {
+      setLoading(false); // 로딩 해제
     }
   };
 
@@ -85,12 +95,16 @@ export default function ScheduleInput({ selectedRange, onRegister }: Props) {
         value={content}
         onChange={(e) => setContent(e.target.value)}
         className="w-full p-2 rounded bg-gray-700 text-white placeholder-gray-400 mb-2"
+        disabled={loading}
       />
       <button
         onClick={handleSubmit}
-        className="w-full bg-[#8d7864] hover:bg-[#a48d77] text-white font-bold py-2 rounded transition duration-300"
+        disabled={loading}
+        className={`w-full font-bold py-2 rounded transition duration-300 ${
+          loading ? "bg-gray-500 cursor-not-allowed" : "bg-[#8d7864] hover:bg-[#a48d77] text-white"
+        }`}
       >
-        일정 등록
+        {loading ? "등록 중..." : "일정 등록"}
       </button>
     </div>
   );
