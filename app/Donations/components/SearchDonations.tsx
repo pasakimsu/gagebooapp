@@ -102,6 +102,16 @@ const SearchDonations = forwardRef<SearchDonationsRef>((_, ref) => {
   const [addingType, setAddingType] = useState<"received" | "sent" | null>(null);
   const [form, setForm] = useState({ date: getTodayStr(), name: "", reason: "", amount: "" });
 
+  const countCommonChars = (str1: string, str2: string) => {
+    const set1 = new Set(str1.trim().split(''));
+    const set2 = new Set(str2.trim().split(''));
+    let count = 0;
+    for (const char of set1) {
+      if (set2.has(char)) count++;
+    }
+    return count;
+  };
+
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     if (name === "amount") {
@@ -124,14 +134,22 @@ const SearchDonations = forwardRef<SearchDonationsRef>((_, ref) => {
 
     try {
       const userId = localStorage.getItem("userId") || "donations";
+
+      // 2글자 이상 일치 검색을 위해 전체 데이터를 가져온 후 클라이언트 측에서 필터링합니다.
+      const snapshot = await getDocs(collection(db, userId));
+      const allData = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as Omit<DonationData, "id">) }));
+
       let results: DonationData[] = [];
       if (isAll) {
-        const snapshot = await getDocs(collection(db, userId));
-        results = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as Omit<DonationData, "id">) }));
+        results = allData;
       } else {
-        const q = query(collection(db, userId), where("nameKeywords", "array-contains", term));
-        const snapshot = await getDocs(q);
-        results = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as Omit<DonationData, "id">) }));
+        results = allData.filter(item => {
+          // 이름 자체가 검색어를 포함하거나, 검색어가 이름을 포함하거나,
+          // 또는 겹치는 글자가 2개 이상인 경우 결과에 포함합니다.
+          const matchCount = countCommonChars(term, item.name);
+          const isSubstring = item.name.includes(term) || term.includes(item.name);
+          return matchCount >= 2 || isSubstring;
+        });
       }
 
       setAllFetchedRecords(results);
