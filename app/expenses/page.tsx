@@ -120,6 +120,12 @@ const ExpenseManager = ({ owner, items, onSave }: { owner: "bak" | "yong", items
     }
   };
 
+  const sortedDisplayItems = [...localItems].sort((a, b) => {
+    const dayA = Number(a.day) || 0;
+    const dayB = Number(b.day) || 0;
+    return dayB - dayA; // 내림차순 (31일 -> 1일)
+  });
+
   return (
     <div className="w-full bg-[#3a312a] p-4 sm:p-6 rounded-3xl border border-brownBorder shadow-2xl overflow-hidden">
       <div className="flex justify-between items-center mb-6">
@@ -128,12 +134,12 @@ const ExpenseManager = ({ owner, items, onSave }: { owner: "bak" | "yong", items
       </div>
 
       <div className="space-y-4">
-        {localItems.length === 0 ? (
+        {sortedDisplayItems.length === 0 ? (
           <div className="text-center py-12 border-2 border-dashed border-gray-700 rounded-2xl text-gray-500 text-sm">
             오른쪽 위 + 버튼을 눌러<br/>고정지출을 추가하세요!
           </div>
         ) : (
-          localItems.map((item) => (
+          sortedDisplayItems.map((item) => (
             <div
               key={item.id}
               className={`bg-black/20 rounded-2xl border transition-all overflow-hidden ${
@@ -178,16 +184,16 @@ const ExpenseManager = ({ owner, items, onSave }: { owner: "bak" | "yong", items
                   </div>
                   <div className="flex gap-2 pt-2">
                     <button
-                      onClick={() => handleDelete(item.id)}
-                      className="flex-1 bg-gray-700 text-rose-400 font-bold py-4 rounded-2xl active:scale-95 transition shadow-lg border border-rose-900/30"
-                    >
-                      삭제하기
-                    </button>
-                    <button
                       onClick={handleIndividualSave}
                       className="flex-[2] bg-beigeLight text-darkText font-black py-4 rounded-2xl active:scale-95 transition shadow-lg text-lg"
                     >
                       저장하기
+                    </button>
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      className="flex-1 bg-gray-700 text-rose-400 font-bold py-4 rounded-2xl active:scale-95 transition shadow-lg border border-rose-900/30"
+                    >
+                      삭제하기
                     </button>
                   </div>
                 </div>
