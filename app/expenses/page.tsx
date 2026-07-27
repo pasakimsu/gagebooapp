@@ -79,6 +79,8 @@ const ExpensesDashboard = ({ state }: { state: ExpenseState }) => {
 
 const ExpenseManager = ({ owner, items, onSave }: { owner: "bak" | "yong", items: ExpenseItem[], onSave: (newItems: ExpenseItem[]) => void }) => {
   const [localItems, setLocalItems] = useState<ExpenseItem[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
   const colorClass = owner === "bak" ? "text-emerald-400" : "text-red-400";
   const btnColor = owner === "bak" ? "bg-emerald-600" : "bg-red-600";
 
@@ -89,6 +91,7 @@ const ExpenseManager = ({ owner, items, onSave }: { owner: "bak" | "yong", items
   const handleAdd = () => {
     const newItem: ExpenseItem = { id: Date.now().toString(), name: "", amount: "", day: "" };
     setLocalItems([...localItems, newItem]);
+    setEditingId(newItem.id);
   };
 
   const handleUpdate = (id: string, field: keyof ExpenseItem, value: string) => {
@@ -96,7 +99,20 @@ const ExpenseManager = ({ owner, items, onSave }: { owner: "bak" | "yong", items
   };
 
   const handleDelete = (id: string) => {
-    setLocalItems(localItems.filter(item => item.id !== id));
+    if (confirm("정말로 이 지출 항목을 삭제하시겠습니까?")) {
+      const newList = localItems.filter(item => item.id !== id);
+      setLocalItems(newList);
+      // 삭제는 즉시 반영하여 '다시 나타나는' 현상 방지
+      onSave(newList);
+    }
+  };
+
+  const toggleEdit = (id: string) => {
+    if (editingId === id) {
+      setEditingId(null);
+    } else {
+      setEditingId(id);
+    }
   };
 
   return (
@@ -113,42 +129,60 @@ const ExpenseManager = ({ owner, items, onSave }: { owner: "bak" | "yong", items
           </div>
         ) : (
           localItems.map((item) => (
-            <div key={item.id} className="bg-black/20 p-4 rounded-2xl border border-gray-700 space-y-3 relative group">
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  value={item.day}
-                  onChange={(e) => handleUpdate(item.id, "day", e.target.value)}
-                  className="w-16 p-2 rounded-lg bg-gray-800 text-white border border-gray-600 text-center text-sm outline-none focus:ring-1 focus:ring-beigeLight"
-                  placeholder="일"
-                />
-                <input
-                  type="text"
-                  value={item.name}
-                  onChange={(e) => handleUpdate(item.id, "name", e.target.value)}
-                  className="flex-1 p-2 rounded-lg bg-gray-800 text-white border border-gray-600 text-sm outline-none focus:ring-1 focus:ring-beigeLight"
-                  placeholder="지출 항목명"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={item.amount}
-                  inputMode="numeric"
-                  onChange={(e) => handleUpdate(item.id, "amount", e.target.value)}
-                  className="flex-1 p-2 rounded-lg bg-gray-800 text-white border border-gray-600 text-right text-sm font-bold outline-none focus:ring-1 focus:ring-beigeLight"
-                  placeholder="금액 입력"
-                />
-                <span className="text-gray-400 text-xs">원</span>
-                <button
-                  onClick={() => handleDelete(item.id)}
-                  className="ml-2 bg-gray-600/50 hover:bg-rose-900/50 text-white px-3 py-2 rounded-lg text-[10px] font-bold transition"
-                >
-                  삭제
-                </button>
-              </div>
-              {item.amount && (
-                <p className="text-[10px] text-right text-beigeLight/60 font-medium">{numberToKorean(Number(item.amount.replace(/,/g, "")) || 0)}</p>
+            <div key={item.id} className={`bg-black/20 p-4 rounded-2xl border ${editingId === item.id ? 'border-beigeLight ring-1 ring-beigeLight' : 'border-gray-700'} space-y-3 relative transition-all`}>
+              {editingId === item.id ? (
+                <>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      value={item.day}
+                      onChange={(e) => handleUpdate(item.id, "day", e.target.value)}
+                      className="w-16 p-2 rounded-lg bg-gray-800 text-white border border-gray-600 text-center text-sm outline-none focus:ring-1 focus:ring-beigeLight"
+                      placeholder="일"
+                    />
+                    <input
+                      type="text"
+                      value={item.name}
+                      onChange={(e) => handleUpdate(item.id, "name", e.target.value)}
+                      className="flex-1 p-2 rounded-lg bg-gray-800 text-white border border-gray-600 text-sm outline-none focus:ring-1 focus:ring-beigeLight"
+                      placeholder="지출 항목명"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={item.amount}
+                      inputMode="numeric"
+                      onChange={(e) => handleUpdate(item.id, "amount", e.target.value)}
+                      className="flex-1 p-2 rounded-lg bg-gray-800 text-white border border-gray-600 text-right text-sm font-bold outline-none focus:ring-1 focus:ring-beigeLight"
+                      placeholder="금액 입력"
+                    />
+                    <span className="text-gray-400 text-xs">원</span>
+                    <button
+                      onClick={() => toggleEdit(item.id)}
+                      className="ml-2 bg-beigeLight text-darkText px-3 py-2 rounded-lg text-[10px] font-black transition"
+                    >
+                      완료
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex justify-between items-center">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-gray-500 font-bold">{item.day}일 결제</span>
+                    <span className="text-white font-bold text-base">{item.name}</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <p className={`text-lg font-black ${colorClass}`}>{Number(item.amount.replace(/,/g, "")).toLocaleString()}원</p>
+                      <p className="text-[9px] text-gray-500">{numberToKorean(Number(item.amount.replace(/,/g, "")) || 0)}</p>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <button onClick={() => toggleEdit(item.id)} className="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-[9px] font-bold transition">수정</button>
+                      <button onClick={() => handleDelete(item.id)} className="bg-rose-900/30 hover:bg-rose-900/60 text-rose-400 px-2 py-1 rounded text-[9px] font-bold transition">삭제</button>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           ))
@@ -157,10 +191,13 @@ const ExpenseManager = ({ owner, items, onSave }: { owner: "bak" | "yong", items
 
       {localItems.length > 0 && (
         <button
-          onClick={() => onSave(localItems)}
+          onClick={() => {
+            onSave(localItems);
+            setEditingId(null);
+          }}
           className="w-full bg-beigeLight text-darkText font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-all text-lg"
         >
-          저장하기
+          전체 저장하기
         </button>
       )}
     </div>
