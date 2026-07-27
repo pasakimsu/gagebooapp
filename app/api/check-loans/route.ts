@@ -3,12 +3,29 @@ import { getApps, initializeApp, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
 if (!getApps().length) {
-  const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (serviceAccountKey) {
-    const serviceAccount = JSON.parse(serviceAccountKey.replace(/\\n/g, '\n'));
-    initializeApp({
-      credential: cert(serviceAccount),
-    });
+  try {
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+
+    if (projectId && clientEmail && privateKey) {
+      initializeApp({
+        credential: cert({
+          projectId,
+          clientEmail,
+          privateKey: privateKey.replace(/\\n/g, '\n'),
+        }),
+      });
+    } else {
+      // Fallback for older env var
+      const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+      if (serviceAccountKey) {
+        const serviceAccount = JSON.parse(serviceAccountKey.replace(/\\n/g, '\n'));
+        initializeApp({ credential: cert(serviceAccount) });
+      }
+    }
+  } catch (error) {
+    console.error("Diagnostic API Init Error:", error);
   }
 }
 
