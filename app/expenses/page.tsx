@@ -149,54 +149,56 @@ const ExpenseManager = ({ owner, items, onSave }: { owner: "bak" | "yong", items
               }`}
             >
               {editingId === item.id ? (
-                <div className="p-5 space-y-4">
-                  <div className="grid grid-cols-4 gap-2">
-                    <div className="col-span-1">
-                      <label className="text-[10px] text-gray-500 font-bold block mb-1">결제일</label>
-                      <input
-                        type="number"
-                        value={item.day}
-                        onChange={(e) => handleUpdate(item.id, "day", e.target.value)}
-                        className="w-full p-3 rounded-xl bg-gray-800 text-white border border-gray-600 text-center text-base outline-none focus:ring-1 focus:ring-beigeLight"
-                        placeholder="일"
-                      />
+                <div className="p-5 cursor-pointer" onClick={() => setEditingId(null)}>
+                  <div className="space-y-4 cursor-default" onClick={(e) => e.stopPropagation()}>
+                    <div className="grid grid-cols-4 gap-2">
+                      <div className="col-span-1">
+                        <label className="text-[10px] text-gray-500 font-bold block mb-1">결제일</label>
+                        <input
+                          type="number"
+                          value={item.day}
+                          onChange={(e) => handleUpdate(item.id, "day", e.target.value)}
+                          className="w-full p-3 rounded-xl bg-gray-800 text-white border border-gray-600 text-center text-base outline-none focus:ring-1 focus:ring-beigeLight"
+                          placeholder="일"
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <label className="text-[10px] text-gray-500 font-bold block mb-1">항목명</label>
+                        <input
+                          type="text"
+                          value={item.name}
+                          onChange={(e) => handleUpdate(item.id, "name", e.target.value)}
+                          className="w-full p-3 rounded-xl bg-gray-800 text-white border border-gray-600 text-base outline-none focus:ring-1 focus:ring-beigeLight"
+                          placeholder="지출 항목명"
+                        />
+                      </div>
                     </div>
-                    <div className="col-span-3">
-                      <label className="text-[10px] text-gray-500 font-bold block mb-1">항목명</label>
+                    <div>
+                      <label className="text-[10px] text-gray-500 font-bold block mb-1 text-right">금액 (원)</label>
                       <input
                         type="text"
-                        value={item.name}
-                        onChange={(e) => handleUpdate(item.id, "name", e.target.value)}
-                        className="w-full p-3 rounded-xl bg-gray-800 text-white border border-gray-600 text-base outline-none focus:ring-1 focus:ring-beigeLight"
-                        placeholder="지출 항목명"
+                        value={item.amount}
+                        inputMode="numeric"
+                        onChange={(e) => handleUpdate(item.id, "amount", e.target.value)}
+                        className="w-full p-4 rounded-xl bg-gray-800 text-white border border-gray-600 text-right text-xl font-black outline-none focus:ring-1 focus:ring-beigeLight"
+                        placeholder="금액 입력"
                       />
+                      <p className="text-[11px] text-right text-beigeLight/80 font-bold mt-1">{numberToKorean(Number(item.amount.replace(/,/g, "")) || 0)}</p>
                     </div>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-gray-500 font-bold block mb-1 text-right">금액 (원)</label>
-                    <input
-                      type="text"
-                      value={item.amount}
-                      inputMode="numeric"
-                      onChange={(e) => handleUpdate(item.id, "amount", e.target.value)}
-                      className="w-full p-4 rounded-xl bg-gray-800 text-white border border-gray-600 text-right text-xl font-black outline-none focus:ring-1 focus:ring-beigeLight"
-                      placeholder="금액 입력"
-                    />
-                    <p className="text-[11px] text-right text-beigeLight/80 font-bold mt-1">{numberToKorean(Number(item.amount.replace(/,/g, "")) || 0)}</p>
-                  </div>
-                  <div className="flex gap-2 pt-2">
-                    <button
-                      onClick={handleIndividualSave}
-                      className="flex-[2] bg-beigeLight text-darkText font-black py-4 rounded-2xl active:scale-95 transition shadow-lg text-lg"
-                    >
-                      저장하기
-                    </button>
-                    <button
-                      onClick={() => handleDelete(item.id)}
-                      className="flex-1 bg-gray-700 text-rose-400 font-bold py-4 rounded-2xl active:scale-95 transition shadow-lg border border-rose-900/30"
-                    >
-                      삭제하기
-                    </button>
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        onClick={handleIndividualSave}
+                        className="flex-[2] bg-beigeLight text-darkText font-black py-4 rounded-2xl active:scale-95 transition shadow-lg text-lg"
+                      >
+                        저장하기
+                      </button>
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        className="flex-1 bg-gray-700 text-rose-400 font-bold py-4 rounded-2xl active:scale-95 transition shadow-lg border border-rose-900/30"
+                      >
+                        삭제하기
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (
