@@ -50,12 +50,14 @@ const ExpensesDashboard = ({ state }: { state: ExpenseState }) => {
         {items.length === 0 ? (
           <p className="text-gray-500 text-[11px] text-center py-4 italic">등록된 지출이 없습니다.</p>
         ) : (
-          items.map(item => (
-            <div key={item.id} className="flex justify-between text-[11px] border-b border-white/5 pb-1">
-              <span className="text-gray-400">{item.day}일 | {item.name}</span>
-              <span className="text-gray-300">{Number(item.amount.replace(/,/g, "")).toLocaleString()}원</span>
-            </div>
-          ))
+          [...items]
+            .sort((a, b) => (Number(a.day) || 0) - (Number(b.day) || 0))
+            .map(item => (
+              <div key={item.id} className="flex justify-between text-[11px] border-b border-white/5 pb-1">
+                <span className="text-gray-400">{item.day}일 | {item.name}</span>
+                <span className="text-gray-300">{Number(item.amount.replace(/,/g, "")).toLocaleString()}원</span>
+              </div>
+            ))
         )}
       </div>
     </div>
@@ -123,7 +125,7 @@ const ExpenseManager = ({ owner, items, onSave }: { owner: "bak" | "yong", items
   const sortedDisplayItems = [...localItems].sort((a, b) => {
     const dayA = Number(a.day) || 0;
     const dayB = Number(b.day) || 0;
-    return dayB - dayA; // 내림차순 (31일 -> 1일)
+    return dayA - dayB; // 오름차순 (1일 -> 31일)
   });
 
   return (
