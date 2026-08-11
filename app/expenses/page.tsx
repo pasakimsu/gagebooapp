@@ -67,7 +67,7 @@ const ExpensesDashboard = ({ state, loans }: { state: ExpenseState, loans: { hom
     { id: "loan-home", name: "🏠 주택담보대출", amount: homeMonthly.toString(), day: loans.home.repaymentDay || "21" },
     { id: "loan-park", name: "💳 박재현 신용대출", amount: parkMonthly.toString(), day: loans.park.repaymentDay || "21" },
     { id: "loan-kim", name: "💳 김용휘 신용대출", amount: kimMonthly.toString(), day: loans.kim.repaymentDay || "21" }
-  ].filter(item => Number(item.amount) > 0);
+  ]; // 0원이어도 표시되도록 필터 제거
 
   const totalLoanMonthly = homeMonthly + parkMonthly + kimMonthly;
   const totalSum = bakSum + yongSum + totalLoanMonthly;
