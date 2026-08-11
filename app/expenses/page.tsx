@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AuthGuard from "@/components/AuthGuard";
-import { db, doc, onSnapshot, setDoc } from "@/lib/firebase";
+import { db, doc, onSnapshot, setDoc, getDoc } from "@/lib/firebase";
 
 interface ExpenseItem {
   id: string;
@@ -15,6 +15,28 @@ interface ExpenseState {
   bak: ExpenseItem[];
   yong: ExpenseItem[];
 }
+
+interface LoanState {
+  amount: string;
+  startDate: string;
+  repaymentDay: string;
+  period: string;
+  periodUnit: "month";
+  rate: string;
+  method: string;
+  monthlyPayment: number;
+  lastMonthPayment: number;
+  schedule?: any[];
+}
+
+const getRemainingMonths = (startDateStr: string, totalPeriod: string) => {
+  if (!startDateStr || !totalPeriod) return 0;
+  const start = new Date(startDateStr);
+  const now = new Date();
+  if (now < start) return Number(totalPeriod);
+  const elapsed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+  return Math.max(0, Number(totalPeriod) - elapsed);
+};
 
 const numberToKorean = (num: number): string => {
   if (num === 0) return "0원";
@@ -33,12 +55,44 @@ const numberToKorean = (num: number): string => {
 
 const formatNumber = (val: string) => val.replace(/[^0-9]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
-const ExpensesDashboard = ({ state }: { state: ExpenseState }) => {
+const LoanSummaryCard = ({ title, amount, monthly, remainMonths, color }: any) => (
+  <div className="bg-[#3a312a] p-4 rounded-2xl border border-brownBorder shadow-md w-full">
+    <div className="flex justify-between items-start mb-3">
+      <h4 className={`text-base font-bold ${color}`}>{title}</h4>
+      <span className="text-[10px] text-gray-400 font-medium bg-black/20 px-2 py-1 rounded">잔여 {remainMonths}개월</span>
+    </div>
+    <div className="space-y-2">
+      <div className="flex justify-between text-xs">
+        <span className="text-gray-400">대출 원금</span>
+        <span className="text-white font-bold">{Number(amount.replace(/,/g, "")).toLocaleString()}원</span>
+      </div>
+      <div className="flex justify-between items-end">
+        <span className="text-gray-400 text-[11px]">이번 달 상환액</span>
+        <span className={`text-lg font-black ${color}`}>{monthly.toLocaleString()}원</span>
+      </div>
+    </div>
+  </div>
+);
+
+const ExpensesDashboard = ({ state, loans }: { state: ExpenseState, loans: { home: LoanState, park: LoanState, kim: LoanState } }) => {
   const getSum = (items: ExpenseItem[]) => items.reduce((sum, item) => sum + Number(item.amount.replace(/,/g, "")), 0);
+
+  const now = new Date();
+  const curY = now.getFullYear();
+  const curM = now.getMonth() + 1;
 
   const bakSum = getSum(state.bak);
   const yongSum = getSum(state.yong);
-  const totalSum = bakSum + yongSum;
+
+  // 대출 상환액 계산
+  const homeMonthly = loans.home.schedule?.find(s => s.year === curY && s.month === curM)?.total || 0;
+  const isParkStarted = loans.park.startDate ? new Date() >= new Date(loans.park.startDate) : false;
+  const isKimStarted = loans.kim.startDate ? new Date() >= new Date(loans.kim.startDate) : false;
+  const parkMonthly = isParkStarted ? loans.park.monthlyPayment : 0;
+  const kimMonthly = isKimStarted ? loans.kim.monthlyPayment : 0;
+
+  const totalLoanMonthly = homeMonthly + parkMonthly + kimMonthly;
+  const totalSum = bakSum + yongSum + totalLoanMonthly;
 
   const SummaryCard = ({ title, total, color, items }: { title: string, total: number, color: string, items: ExpenseItem[] }) => (
     <div className="bg-[#3a312a] p-5 rounded-2xl border border-brownBorder shadow-md w-full">
@@ -66,20 +120,30 @@ const ExpensesDashboard = ({ state }: { state: ExpenseState }) => {
   return (
     <div className="w-full space-y-6">
       <div className="bg-gradient-to-br from-beigeLight to-[#a89273] p-6 rounded-3xl shadow-xl text-darkText text-center w-full">
-        <p className="text-xs font-bold opacity-80 mb-1 uppercase tracking-widest">우리 집 총 고정지출</p>
+        <p className="text-xs font-bold opacity-80 mb-1 uppercase tracking-widest">우리 집 총 지출 (고정+대출)</p>
         <h3 className="text-3xl font-black mb-1">{totalSum.toLocaleString()}원</h3>
         <p className="text-[11px] font-bold opacity-60">{numberToKorean(totalSum)}</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        <SummaryCard title="👤 박재현 지출" total={bakSum} color="text-emerald-400" items={state.bak} />
-        <SummaryCard title="👤 김용휘 지출" total={yongSum} color="text-red-400" items={state.yong} />
+        <SummaryCard title="👤 박재현 고정지출" total={bakSum} color="text-emerald-400" items={state.bak} />
+        <SummaryCard title="👤 김용휘 고정지출" total={yongSum} color="text-red-400" items={state.yong} />
+
+        <div className="space-y-3 pt-2">
+          <div className="flex items-center gap-2 px-1">
+            <div className="h-4 w-1 bg-beigeLight rounded-full"></div>
+            <h4 className="text-sm font-bold text-beigeLight">🏦 대출 상환 지출</h4>
+          </div>
+          <LoanSummaryCard title="🏠 주택담보대출" amount={loans.home.amount || "0"} monthly={homeMonthly} remainMonths={getRemainingMonths(loans.home.startDate, loans.home.period)} color="text-beigeLight" />
+          <LoanSummaryCard title="💳 박재현 신용대출" amount={loans.park.amount || "0"} monthly={parkMonthly} remainMonths={getRemainingMonths(loans.park.startDate, loans.park.period)} color="text-yellow-400" />
+          <LoanSummaryCard title="💳 김용휘 신용대출" amount={loans.kim.amount || "0"} monthly={kimMonthly} remainMonths={getRemainingMonths(loans.kim.startDate, loans.kim.period)} color="text-yellow-400" />
+        </div>
       </div>
     </div>
   );
 };
 
-const ExpenseManager = ({ owner, items, onSave }: { owner: "bak" | "yong", items: ExpenseItem[], onSave: (newItems: ExpenseItem[]) => void }) => {
+const ExpenseManager = ({ owner, items, onSave, loan }: { owner: "bak" | "yong", items: ExpenseItem[], onSave: (newItems: ExpenseItem[]) => void, loan: LoanState }) => {
   const [localItems, setLocalItems] = useState<ExpenseItem[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -89,6 +153,9 @@ const ExpenseManager = ({ owner, items, onSave }: { owner: "bak" | "yong", items
   useEffect(() => {
     setLocalItems(items);
   }, [items]);
+
+  const isLoanStarted = loan.startDate ? new Date() >= new Date(loan.startDate) : false;
+  const loanMonthly = isLoanStarted ? loan.monthlyPayment : 0;
 
   const handleAdd = () => {
     const newItem: ExpenseItem = { id: Date.now().toString(), name: "", amount: "", day: "" };
@@ -223,8 +290,21 @@ const ExpenseManager = ({ owner, items, onSave }: { owner: "bak" | "yong", items
         )}
       </div>
 
-      <div className="mt-8 text-center">
-        <p className="text-[10px] text-gray-600 font-medium">항목을 터치하면 수정하거나 삭제할 수 있습니다.</p>
+      <div className="mt-8 text-center space-y-8">
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 px-1">
+            <div className="h-4 w-1 bg-yellow-400 rounded-full"></div>
+            <h4 className="text-sm font-bold text-yellow-400">💳 본인 명의 신용대출</h4>
+          </div>
+          <LoanSummaryCard
+            title={owner === "bak" ? "박재현 신용대출" : "김용휘 신용대출"}
+            amount={loan.amount || "0"}
+            monthly={loanMonthly}
+            remainMonths={getRemainingMonths(loan.startDate, loan.period)}
+            color="text-yellow-400"
+          />
+        </div>
+        <p className="text-[10px] text-gray-600 font-medium italic">지출 항목을 터치하면 수정하거나 삭제할 수 있습니다.</p>
       </div>
     </div>
   );
@@ -234,14 +314,39 @@ export default function ExpensesPage() {
   const [activeTab, setActiveTab] = useState<"dash" | "bak" | "yong">("dash");
   const [state, setState] = useState<ExpenseState>({ bak: [], yong: [] });
 
+  const initialLoanState: LoanState = { amount: "", startDate: "", repaymentDay: "", period: "", periodUnit: "month", rate: "", method: "", monthlyPayment: 0, lastMonthPayment: 0 };
+  const [loans, setLoans] = useState({
+    home: { ...initialLoanState },
+    park: { ...initialLoanState },
+    kim: { ...initialLoanState }
+  });
+
   useEffect(() => {
+    // 1. 고정지출 데이터 구독
     const docRef = doc(db, "settings", "fixedExpensesV1");
-    const unsubscribe = onSnapshot(docRef, (snap) => {
+    const unsubscribeExpenses = onSnapshot(docRef, (snap) => {
       if (snap.exists()) {
         setState(snap.data() as ExpenseState);
       }
     });
-    return () => unsubscribe();
+
+    // 2. 대출 데이터 구독 (실시간)
+    const loanDocRef = doc(db, "loans", "loanStateV14");
+    const unsubscribeLoans = onSnapshot(loanDocRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setLoans({
+          home: data.home || initialLoanState,
+          park: data.park || initialLoanState,
+          kim: data.kim || initialLoanState
+        });
+      }
+    });
+
+    return () => {
+      unsubscribeExpenses();
+      unsubscribeLoans();
+    };
   }, []);
 
   const handleSave = async (owner: "bak" | "yong", newItems: ExpenseItem[]) => {
@@ -276,9 +381,9 @@ export default function ExpensesPage() {
           </div>
 
           <div className="w-full animate-in fade-in duration-500">
-            {activeTab === "dash" && <ExpensesDashboard state={state} />}
-            {activeTab === "bak" && <ExpenseManager owner="bak" items={state.bak} onSave={(items) => handleSave("bak", items)} />}
-            {activeTab === "yong" && <ExpenseManager owner="yong" items={state.yong} onSave={(items) => handleSave("yong", items)} />}
+            {activeTab === "dash" && <ExpensesDashboard state={state} loans={loans} />}
+            {activeTab === "bak" && <ExpenseManager owner="bak" items={state.bak} onSave={(items) => handleSave("bak", items)} loan={loans.park} />}
+            {activeTab === "yong" && <ExpenseManager owner="yong" items={state.yong} onSave={(items) => handleSave("yong", items)} loan={loans.kim} />}
           </div>
         </div>
       </div>
