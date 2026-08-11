@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AuthGuard from "@/components/AuthGuard";
-import { db, doc, onSnapshot, setDoc, getDoc } from "@/lib/firebase";
+import { db, doc, onSnapshot, setDoc } from "@/lib/firebase";
 
 interface ExpenseItem {
   id: string;
@@ -29,15 +29,6 @@ interface LoanState {
   schedule?: any[];
 }
 
-const getRemainingMonths = (startDateStr: string, totalPeriod: string) => {
-  if (!startDateStr || !totalPeriod) return 0;
-  const start = new Date(startDateStr);
-  const now = new Date();
-  if (now < start) return Number(totalPeriod);
-  const elapsed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-  return Math.max(0, Number(totalPeriod) - elapsed);
-};
-
 const numberToKorean = (num: number): string => {
   if (num === 0) return "0원";
   const units = ["", "만", "억", "조"];
@@ -55,25 +46,6 @@ const numberToKorean = (num: number): string => {
 
 const formatNumber = (val: string) => val.replace(/[^0-9]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
-const LoanSummaryCard = ({ title, amount, monthly, remainMonths, color }: any) => (
-  <div className="bg-[#3a312a] p-4 rounded-2xl border border-brownBorder shadow-md w-full">
-    <div className="flex justify-between items-start mb-3">
-      <h4 className={`text-base font-bold ${color}`}>{title}</h4>
-      <span className="text-[10px] text-gray-400 font-medium bg-black/20 px-2 py-1 rounded">잔여 {remainMonths}개월</span>
-    </div>
-    <div className="space-y-2">
-      <div className="flex justify-between text-xs">
-        <span className="text-gray-400">대출 원금</span>
-        <span className="text-white font-bold">{Number(amount.replace(/,/g, "")).toLocaleString()}원</span>
-      </div>
-      <div className="flex justify-between items-end">
-        <span className="text-gray-400 text-[11px]">이번 달 상환액</span>
-        <span className={`text-lg font-black ${color}`}>{monthly.toLocaleString()}원</span>
-      </div>
-    </div>
-  </div>
-);
-
 const ExpensesDashboard = ({ state, loans }: { state: ExpenseState, loans: { home: LoanState, park: LoanState, kim: LoanState } }) => {
   const getSum = (items: ExpenseItem[]) => items.reduce((sum, item) => sum + Number(item.amount.replace(/,/g, "")), 0);
 
@@ -84,32 +56,43 @@ const ExpensesDashboard = ({ state, loans }: { state: ExpenseState, loans: { hom
   const bakSum = getSum(state.bak);
   const yongSum = getSum(state.yong);
 
-  // 대출 상환액 계산
+  // 대출 항목들을 일반 고정지출 양식으로 변환
   const homeMonthly = loans.home.schedule?.find(s => s.year === curY && s.month === curM)?.total || 0;
   const isParkStarted = loans.park.startDate ? new Date() >= new Date(loans.park.startDate) : false;
   const isKimStarted = loans.kim.startDate ? new Date() >= new Date(loans.kim.startDate) : false;
   const parkMonthly = isParkStarted ? loans.park.monthlyPayment : 0;
   const kimMonthly = isKimStarted ? loans.kim.monthlyPayment : 0;
 
+  const loanItems: ExpenseItem[] = [
+    { id: "loan-home", name: "🏠 주택담보대출", amount: homeMonthly.toString(), day: loans.home.repaymentDay || "21" },
+    { id: "loan-park", name: "💳 박재현 신용대출", amount: parkMonthly.toString(), day: loans.park.repaymentDay || "21" },
+    { id: "loan-kim", name: "💳 김용휘 신용대출", amount: kimMonthly.toString(), day: loans.kim.repaymentDay || "21" }
+  ].filter(item => Number(item.amount) > 0);
+
   const totalLoanMonthly = homeMonthly + parkMonthly + kimMonthly;
   const totalSum = bakSum + yongSum + totalLoanMonthly;
 
-  const SummaryCard = ({ title, total, color, items }: { title: string, total: number, color: string, items: ExpenseItem[] }) => (
+  const SummaryCard = ({ title, total, color, items, isLoan }: { title: string, total: number, color: string, items: ExpenseItem[], isLoan?: boolean }) => (
     <div className="bg-[#3a312a] p-5 rounded-2xl border border-brownBorder shadow-md w-full">
       <div className="flex justify-between items-center mb-4">
         <h4 className={`text-base font-bold ${color}`}>{title}</h4>
         <span className="text-lg font-black text-white">{total.toLocaleString()}원</span>
       </div>
-      <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2 custom-scrollbar">
+      <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
         {items.length === 0 ? (
-          <p className="text-gray-500 text-[11px] text-center py-4 italic">등록된 지출이 없습니다.</p>
+          <p className="text-gray-500 text-[11px] text-center py-4 italic">내역이 없습니다.</p>
         ) : (
           [...items]
             .sort((a, b) => (Number(a.day) || 0) - (Number(b.day) || 0))
             .map(item => (
-              <div key={item.id} className="flex justify-between text-[11px] border-b border-white/5 pb-1">
-                <span className="text-gray-400">{item.day}일 | {item.name}</span>
-                <span className="text-gray-300">{Number(item.amount.replace(/,/g, "")).toLocaleString()}원</span>
+              <div key={item.id} className="flex justify-between items-center text-[11px] border-b border-white/5 pb-1">
+                <span className="text-gray-400">
+                  <span className="font-bold text-beigeLight w-6 inline-block">{item.day}일</span>
+                  <span className="ml-1">{item.name}</span>
+                </span>
+                <span className={`${isLoan ? 'text-yellow-400 font-bold' : 'text-gray-300'}`}>
+                  {Number(item.amount.replace(/,/g, "")).toLocaleString()}원
+                </span>
               </div>
             ))
         )}
@@ -128,16 +111,7 @@ const ExpensesDashboard = ({ state, loans }: { state: ExpenseState, loans: { hom
       <div className="grid grid-cols-1 gap-4">
         <SummaryCard title="👤 박재현 고정지출" total={bakSum} color="text-emerald-400" items={state.bak} />
         <SummaryCard title="👤 김용휘 고정지출" total={yongSum} color="text-red-400" items={state.yong} />
-
-        <div className="space-y-3 pt-2">
-          <div className="flex items-center gap-2 px-1">
-            <div className="h-4 w-1 bg-beigeLight rounded-full"></div>
-            <h4 className="text-sm font-bold text-beigeLight">🏦 대출 상환 지출</h4>
-          </div>
-          <LoanSummaryCard title="🏠 주택담보대출" amount={loans.home.amount || "0"} monthly={homeMonthly} remainMonths={getRemainingMonths(loans.home.startDate, loans.home.period)} color="text-beigeLight" />
-          <LoanSummaryCard title="💳 박재현 신용대출" amount={loans.park.amount || "0"} monthly={parkMonthly} remainMonths={getRemainingMonths(loans.park.startDate, loans.park.period)} color="text-yellow-400" />
-          <LoanSummaryCard title="💳 김용휘 신용대출" amount={loans.kim.amount || "0"} monthly={kimMonthly} remainMonths={getRemainingMonths(loans.kim.startDate, loans.kim.period)} color="text-yellow-400" />
-        </div>
+        <SummaryCard title="🏦 대출 상환 고정지출" total={totalLoanMonthly} color="text-beigeLight" items={loanItems} isLoan={true} />
       </div>
     </div>
   );
@@ -154,8 +128,8 @@ const ExpenseManager = ({ owner, items, onSave, loan }: { owner: "bak" | "yong",
     setLocalItems(items);
   }, [items]);
 
-  const isLoanStarted = loan.startDate ? new Date() >= new Date(loan.startDate) : false;
-  const loanMonthly = isLoanStarted ? loan.monthlyPayment : 0;
+  const isLoanActive = Number(loan.amount?.replace(/,/g, "")) > 0;
+  const loanMonthly = isLoanActive ? loan.monthlyPayment : 0;
 
   const handleAdd = () => {
     const newItem: ExpenseItem = { id: Date.now().toString(), name: "", amount: "", day: "" };
@@ -192,7 +166,7 @@ const ExpenseManager = ({ owner, items, onSave, loan }: { owner: "bak" | "yong",
   const sortedDisplayItems = [...localItems].sort((a, b) => {
     const dayA = Number(a.day) || 0;
     const dayB = Number(b.day) || 0;
-    return dayA - dayB; // 오름차순 (1일 -> 31일)
+    return dayA - dayB; // 오름차순
   });
 
   return (
@@ -203,7 +177,8 @@ const ExpenseManager = ({ owner, items, onSave, loan }: { owner: "bak" | "yong",
       </div>
 
       <div className="space-y-4">
-        {sortedDisplayItems.length === 0 ? (
+        {/* 일반 고정지출 목록 */}
+        {sortedDisplayItems.length === 0 && !isLoanActive ? (
           <div className="text-center py-12 border-2 border-dashed border-gray-700 rounded-2xl text-gray-500 text-sm">
             오른쪽 위 + 버튼을 눌러<br/>고정지출을 추가하세요!
           </div>
@@ -254,16 +229,16 @@ const ExpenseManager = ({ owner, items, onSave, loan }: { owner: "bak" | "yong",
                     </div>
                     <div className="flex gap-2 pt-2">
                       <button
-                        onClick={handleIndividualSave}
-                        className="flex-[2] bg-beigeLight text-darkText font-black py-4 rounded-2xl active:scale-95 transition shadow-lg text-lg"
-                      >
-                        저장하기
-                      </button>
-                      <button
                         onClick={() => handleDelete(item.id)}
                         className="flex-1 bg-gray-700 text-rose-400 font-bold py-4 rounded-2xl active:scale-95 transition shadow-lg border border-rose-900/30"
                       >
                         삭제하기
+                      </button>
+                      <button
+                        onClick={handleIndividualSave}
+                        className="flex-[2] bg-beigeLight text-darkText font-black py-4 rounded-2xl active:scale-95 transition shadow-lg text-lg"
+                      >
+                        저장하기
                       </button>
                     </div>
                   </div>
@@ -288,22 +263,25 @@ const ExpenseManager = ({ owner, items, onSave, loan }: { owner: "bak" | "yong",
             </div>
           ))
         )}
+
+        {/* 대출 상환 항목 (고정지출 양식과 동일한 디자인, 수정 불가) */}
+        {isLoanActive && (
+          <div className="bg-black/20 rounded-2xl border border-yellow-600/50 overflow-hidden shadow-inner">
+            <div className="p-4 flex justify-between items-center">
+              <div className="flex flex-col">
+                <span className="text-[10px] text-yellow-500 font-bold">{loan.repaymentDay || "21"}일 상환</span>
+                <span className="text-white font-bold text-base">{owner === "bak" ? "박재현" : "김용휘"} 신용대출</span>
+              </div>
+              <div className="text-right">
+                <p className="text-lg font-black text-yellow-400">{loanMonthly.toLocaleString()}원</p>
+                <span className="text-[9px] text-gray-500 bg-yellow-950/30 px-2 py-0.5 rounded italic border border-yellow-900/10">대출관리시스템 연동됨</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="mt-8 text-center space-y-8">
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 px-1">
-            <div className="h-4 w-1 bg-yellow-400 rounded-full"></div>
-            <h4 className="text-sm font-bold text-yellow-400">💳 본인 명의 신용대출</h4>
-          </div>
-          <LoanSummaryCard
-            title={owner === "bak" ? "박재현 신용대출" : "김용휘 신용대출"}
-            amount={loan.amount || "0"}
-            monthly={loanMonthly}
-            remainMonths={getRemainingMonths(loan.startDate, loan.period)}
-            color="text-yellow-400"
-          />
-        </div>
+      <div className="mt-8 text-center">
         <p className="text-[10px] text-gray-600 font-medium italic">지출 항목을 터치하면 수정하거나 삭제할 수 있습니다.</p>
       </div>
     </div>
