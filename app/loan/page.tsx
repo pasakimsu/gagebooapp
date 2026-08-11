@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AuthGuard from "@/components/AuthGuard";
-import { db, doc, onSnapshot, updateDoc, setDoc, getDoc } from "@/lib/firebase";
+import { db, doc, onSnapshot, updateDoc, setDoc, getDoc, deleteField } from "@/lib/firebase";
 
 type RepaymentMethod = "원리금균등" | "원금균등" | "만기일시" | "체증식";
 
@@ -360,8 +360,33 @@ export default function LoanPage() {
     } catch (e) { console.error(e); }
   };
 
+  const deleteLoanData = async (type: string) => {
+    try {
+      const loanDocRef = doc(db, "loans", "loanStateV14");
+      await updateDoc(loanDocRef, { [type]: deleteField() });
+      const resetState = { ...initialLoanState, method: type === "home" ? "체증식" : "만기일시" } as LoanState;
+      if (type === "home") setHomeLoan(resetState);
+      else if (type === "park") setCreditLoanPark(resetState);
+      else if (type === "kim") setCreditLoanKim(resetState);
+      alert("✅ 대출 정보가 삭제되었습니다.");
+    } catch (e) {
+      console.error(e);
+      alert("❌ 삭제 중 오류가 발생했습니다.");
+    }
+  };
+
   const handleCalculate = (type: string, targetState?: LoanState) => {
     let loan = targetState || (type === "home" ? homeLoan : (type === "park" ? creditLoanPark : creditLoanKim));
+
+    // 초기화 상태(금액이 없음)에서 저장을 누르면 삭제 처리
+    if (!loan.amount || loan.amount === "") {
+      if (confirm("대출 금액이 비어있습니다. 이 대출 정보를 완전히 삭제하시겠습니까?")) {
+        deleteLoanData(type);
+        return;
+      }
+      return;
+    }
+
     const p = Number(loan.amount.replace(/,/g, ""));
     const n = Number(loan.period);
     const r = Number(loan.rate);

@@ -11,7 +11,8 @@ import {
   addDoc,
   updateDoc,
   onSnapshot,
-  getDoc
+  getDoc,
+  deleteField
 } from "firebase/firestore";
 import { getMessaging, Messaging } from "firebase/messaging";
 
@@ -49,5 +50,6 @@ export {
   addDoc,
   updateDoc,
   onSnapshot,
-  getDoc
+  getDoc,
+  deleteField
 };
