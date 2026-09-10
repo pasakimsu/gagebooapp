@@ -9,12 +9,11 @@ import {
   db,
   collection,
   getDocs,
-  query,
-  where,
   deleteDoc,
   doc,
   updateDoc,
   addDoc,
+  deleteField,
 } from "@/lib/firebase";
 
 export interface SearchDonationsRef {
@@ -54,8 +53,20 @@ const numberToKorean = (num: number): string => {
   return result.trim() + "원";
 };
 
-const DonationCard = ({ item, listType, editingId, editForm, onFormChange, onStartEdit, onUpdate, onDelete, onCancelEdit }: any) => {
-  const isEditing = editingId === item.id;
+const DonationCard = ({
+  item,
+  listType,
+  editingKey,
+  editForm,
+  onFormChange,
+  onStartEdit,
+  onUpdate,
+  onDelete,
+  onCancelEdit,
+}: any) => {
+  const isEditing = editingKey?.id === item.id && editingKey?.listType === listType;
+  const displayDate = listType === "sent" ? (item.sentDate || item.date) : item.date;
+
   if (isEditing) {
     return (
       <div className="bg-[#4a3f37] w-full p-4 rounded-xl border border-beigeLight/50 mb-3 space-y-2 text-left shadow-lg">
@@ -74,7 +85,7 @@ const DonationCard = ({ item, listType, editingId, editForm, onFormChange, onSta
   return (
     <div className="bg-[#4a3f37] w-full p-4 rounded-xl border border-brownBorder/30 mb-3 shadow-sm text-left">
       <div className="space-y-1 mb-3">
-        <p className="text-gray-400 font-medium text-[10px]">📅 {item.date}</p>
+        <p className="text-gray-400 font-medium text-[10px]">📅 {displayDate}</p>
         <p className="text-white font-bold text-sm">👤 {item.name}</p>
         <p className="text-gray-300 text-xs">📝 {item.reason}</p>
         <p className={`font-black text-sm ${listType === 'received' ? 'text-beigeLight' : 'text-[#86b5a7]'}`}>
@@ -98,7 +109,7 @@ const SearchDonations = forwardRef<SearchDonationsRef>((_, ref) => {
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingKey, setEditingKey] = useState<{ id: string; listType: "received" | "sent" } | null>(null);
   const [addingType, setAddingType] = useState<"received" | "sent" | null>(null);
   const [form, setForm] = useState({ date: getTodayStr(), name: "", reason: "", amount: "" });
 
@@ -106,10 +117,8 @@ const SearchDonations = forwardRef<SearchDonationsRef>((_, ref) => {
     const s = search.trim();
     const t = target.trim();
 
-    // 1. 단순 포함 관계 확인
     if (s.includes(t) || t.includes(s)) return true;
 
-    // 2. 연속된 2글자(bigram) 매칭 확인
     if (s.length >= 2) {
       for (let i = 0; i < s.length - 1; i++) {
         const chunk = s.substring(i, i + 2);
@@ -137,12 +146,11 @@ const SearchDonations = forwardRef<SearchDonationsRef>((_, ref) => {
     setHasSearched(true);
     setSelectedPerson(null);
     setAddingType(null);
-    setEditingId(null);
+    setEditingKey(null);
 
     try {
       const userId = localStorage.getItem("userId") || "donations";
 
-      // 정교한 검색을 위해 전체 데이터를 가져온 후 필터링합니다.
       const snapshot = await getDocs(collection(db, userId));
       const allData = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as Omit<DonationData, "id">) }));
 
@@ -157,7 +165,6 @@ const SearchDonations = forwardRef<SearchDonationsRef>((_, ref) => {
       const names = Array.from(new Set(results.map(r => r.name))).sort();
       setUniqueNames(names);
 
-      // 결과가 한 명뿐이면 자동 선택
       if (names.length === 1) setSelectedPerson(names[0]);
 
     } catch (error) { console.error(error); } finally { setLoading(false); }
@@ -177,11 +184,14 @@ const SearchDonations = forwardRef<SearchDonationsRef>((_, ref) => {
       const userId = localStorage.getItem("userId") || "donations";
       const val = Number(form.amount.replace(/,/g, ""));
       await addDoc(collection(db, userId), {
-        date: form.date, name: form.name.trim(), reason: form.reason.trim(),
+        date: form.date,
+        name: form.name.trim(),
+        reason: form.reason.trim(),
         nameKeywords: generateKeywords(form.name.trim()),
         amount: addingType === "received" ? val : 0,
         sentAmount: addingType === "sent" ? val : null,
-        sentDate: addingType === "sent" ? form.date : null
+        sentDate: addingType === "sent" ? form.date : null,
+        type: addingType
       });
       alert("✅ 등록되었습니다.");
       setAddingType(null);
@@ -193,23 +203,98 @@ const SearchDonations = forwardRef<SearchDonationsRef>((_, ref) => {
     try {
       const userId = localStorage.getItem("userId") || "donations";
       const val = Number(form.amount.replace(/,/g, ""));
-      const data: any = { date: form.date, name: form.name.trim(), reason: form.reason.trim(), nameKeywords: generateKeywords(form.name.trim()) };
-      if (listType === "received") data.amount = val;
-      else { data.sentAmount = val; data.sentDate = form.date; }
-      await updateDoc(doc(db, userId, id), data);
+      const docRef = doc(db, userId, id);
+      const targetDoc = allFetchedRecords.find(r => r.id === id);
+
+      if (targetDoc) {
+        const hasBoth = (targetDoc.amount || 0) > 0 && (targetDoc.sentAmount || 0) > 0;
+
+        if (hasBoth) {
+          if (listType === "sent") {
+            // 입금 내역은 기존 문서에 남겨두고(sentAmount 제거), 출금 내역을 새 문서로 분리
+            await updateDoc(docRef, {
+              sentAmount: deleteField(),
+              sentDate: deleteField(),
+            });
+            await addDoc(collection(db, userId), {
+              date: form.date,
+              name: form.name.trim(),
+              reason: form.reason.trim(),
+              nameKeywords: generateKeywords(form.name.trim()),
+              amount: 0,
+              sentAmount: val,
+              sentDate: form.date,
+              type: "sent",
+            });
+          } else {
+            // 출금 내역은 기존 문서에 남겨두고(amount 제거), 입금 내역을 새 문서로 분리
+            await updateDoc(docRef, {
+              amount: 0,
+            });
+            await addDoc(collection(db, userId), {
+              date: form.date,
+              name: form.name.trim(),
+              reason: form.reason.trim(),
+              nameKeywords: generateKeywords(form.name.trim()),
+              amount: val,
+              sentAmount: null,
+              sentDate: null,
+              type: "received",
+            });
+          }
+        } else {
+          // 단일 내역인 경우
+          const data: any = {
+            date: form.date,
+            name: form.name.trim(),
+            reason: form.reason.trim(),
+            nameKeywords: generateKeywords(form.name.trim()),
+          };
+          if (listType === "received") {
+            data.amount = val;
+            data.sentAmount = deleteField();
+            data.sentDate = deleteField();
+          } else {
+            data.sentAmount = val;
+            data.sentDate = form.date;
+            data.amount = 0;
+          }
+          await updateDoc(docRef, data);
+        }
+      }
+
       alert("✅ 수정되었습니다.");
-      setEditingId(null);
+      setEditingKey(null);
       refreshSearch(false);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      alert("❌ 수정 중 오류가 발생했습니다.");
+    }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, listType: "received" | "sent") => {
     if (!confirm("삭제하시겠습니까?")) return;
     try {
       const userId = localStorage.getItem("userId") || "donations";
-      await deleteDoc(doc(db, userId, id));
+      const targetDoc = allFetchedRecords.find(r => r.id === id);
+      if (targetDoc) {
+        const hasBoth = (targetDoc.amount || 0) > 0 && (targetDoc.sentAmount || 0) > 0;
+        if (hasBoth) {
+          const docRef = doc(db, userId, id);
+          if (listType === "received") {
+            await updateDoc(docRef, { amount: 0 });
+          } else {
+            await updateDoc(docRef, { sentAmount: deleteField(), sentDate: deleteField() });
+          }
+        } else {
+          await deleteDoc(doc(db, userId, id));
+        }
+      }
       refreshSearch(false);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      alert("❌ 삭제 중 오류가 발생했습니다.");
+    }
   };
 
   const receivedResults = allFetchedRecords.filter(r => r.name === selectedPerson && (r.amount || 0) > 0);
@@ -270,7 +355,21 @@ const SearchDonations = forwardRef<SearchDonationsRef>((_, ref) => {
             )}
             <div className="space-y-1">
               {receivedResults.map((item) => (
-                <DonationCard key={item.id} item={item} listType="received" editingId={editingId} editForm={form} onFormChange={handleFormChange} onStartEdit={(i: any) => { setEditingId(i.id); setForm({ date: i.date, name: i.name, reason: i.reason, amount: i.amount.toLocaleString() }); }} onUpdate={handleUpdate} onDelete={() => handleDelete(item.id)} onCancelEdit={() => setEditingId(null)} />
+                <DonationCard
+                  key={`${item.id}_received`}
+                  item={item}
+                  listType="received"
+                  editingKey={editingKey}
+                  editForm={form}
+                  onFormChange={handleFormChange}
+                  onStartEdit={(i: any) => {
+                    setEditingKey({ id: i.id, listType: "received" });
+                    setForm({ date: i.date || getTodayStr(), name: i.name, reason: i.reason, amount: (i.amount || 0).toLocaleString() });
+                  }}
+                  onUpdate={handleUpdate}
+                  onDelete={(id: string) => handleDelete(id, "received")}
+                  onCancelEdit={() => setEditingKey(null)}
+                />
               ))}
               {receivedResults.length === 0 && !addingType && <p className="text-gray-500 text-center py-10 text-xs border border-dashed border-gray-700 rounded-xl">입금 내역이 없습니다.</p>}
             </div>
@@ -299,7 +398,21 @@ const SearchDonations = forwardRef<SearchDonationsRef>((_, ref) => {
             )}
             <div className="space-y-1">
               {sentResults.map((item) => (
-                <DonationCard key={item.id} item={item} listType="sent" editingId={editingId} editForm={form} onFormChange={handleFormChange} onStartEdit={(i: any) => { setEditingId(i.id); setForm({ date: i.date, name: i.name, reason: i.reason, amount: (i.sentAmount || 0).toLocaleString() }); }} onUpdate={handleUpdate} onDelete={() => handleDelete(item.id)} onCancelEdit={() => setEditingId(null)} />
+                <DonationCard
+                  key={`${item.id}_sent`}
+                  item={item}
+                  listType="sent"
+                  editingKey={editingKey}
+                  editForm={form}
+                  onFormChange={handleFormChange}
+                  onStartEdit={(i: any) => {
+                    setEditingKey({ id: i.id, listType: "sent" });
+                    setForm({ date: i.sentDate || i.date || getTodayStr(), name: i.name, reason: i.reason, amount: (i.sentAmount || 0).toLocaleString() });
+                  }}
+                  onUpdate={handleUpdate}
+                  onDelete={(id: string) => handleDelete(id, "sent")}
+                  onCancelEdit={() => setEditingKey(null)}
+                />
               ))}
               {sentResults.length === 0 && !addingType && <p className="text-gray-500 text-center py-10 text-xs border border-dashed border-gray-700 rounded-xl">출금 내역이 없습니다.</p>}
             </div>
