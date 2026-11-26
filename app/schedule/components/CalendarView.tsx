@@ -11,6 +11,7 @@ interface Props {
   onRangeChange: (range: [Date, Date]) => void;
   refreshKey: number;
   dutyStartDate: Date;
+  onActiveMonthChange?: (activeDate: Date) => void;
 }
 
 interface ScheduleData {
@@ -59,6 +60,7 @@ export default function CalendarView({
   onRangeChange,
   refreshKey,
   dutyStartDate,
+  onActiveMonthChange,
 }: Props) {
   const [schedules, setSchedules] = useState<ScheduleData[]>([]);
 
@@ -154,6 +156,9 @@ export default function CalendarView({
   const handleChange = (value: Date | [Date | null, Date | null] | null) => {
     if (Array.isArray(value) && value[0] instanceof Date && value[1] instanceof Date) {
       onRangeChange([value[0], value[1]]);
+      onActiveMonthChange?.(value[0]);
+    } else if (value instanceof Date) {
+      onActiveMonthChange?.(value);
     }
   };
 
@@ -161,6 +166,11 @@ export default function CalendarView({
     <div className="bg-white rounded-lg p-4 text-black shadow-md w-full max-w-[430px]">
       <Calendar
         onChange={handleChange}
+        onActiveStartDateChange={({ activeStartDate }) => {
+          if (activeStartDate) {
+            onActiveMonthChange?.(activeStartDate);
+          }
+        }}
         value={selectedRange}
         selectRange={true}
         calendarType="gregory"

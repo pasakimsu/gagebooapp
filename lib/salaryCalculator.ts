@@ -1,6 +1,6 @@
 import {
   FirefighterRank,
-  SALARY_RATES_2026,
+  getRankSalaryRate,
   calculateDutyShiftPay,
   calculateLeaveDeduction,
   calculateExtraDutyPay,
@@ -28,7 +28,11 @@ export interface SalaryCalculationResult {
   year: number;
   month: number;
   rank: FirefighterRank;
+  step: number;
   baseSalary: number; // 기준 봉급 (원)
+  hourlyOvertime: number; // 시간외수당 단가
+  hourlyNight: number; // 야간수당 단가
+  dailyHoliday: number; // 휴일수당 단가
   weekdayDutyCount: number; // 평일 당번 횟수
   holidayDutyCount: number; // 휴일/주말 당번 횟수
   totalDutyCount: number; // 총 당번 횟수
@@ -83,6 +87,8 @@ export function calculateMonthlySalary({
   month,
   dutyStartDate,
   rank = "소방교",
+  step = 10,
+  customBaseSalary,
   schedules = [],
   manualLeaveCounts,
   manualExtraDutyCounts,
@@ -91,11 +97,13 @@ export function calculateMonthlySalary({
   month: number;
   dutyStartDate: Date;
   rank?: FirefighterRank;
+  step?: number;
+  customBaseSalary?: number;
   schedules?: ScheduleItem[];
   manualLeaveCounts?: LeaveCounts;
   manualExtraDutyCounts?: ExtraDutyCounts;
 }): SalaryCalculationResult {
-  const rate = SALARY_RATES_2026[rank] || SALARY_RATES_2026["소방교"];
+  const rate = getRankSalaryRate(rank, step, customBaseSalary);
 
   // 1. 당월 일수 계산 및 근무 스캔
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -160,7 +168,11 @@ export function calculateMonthlySalary({
     year,
     month,
     rank,
+    step,
     baseSalary: rate.baseSalary,
+    hourlyOvertime: rate.hourlyOvertime,
+    hourlyNight: rate.hourlyNight,
+    dailyHoliday: rate.dailyHoliday,
     weekdayDutyCount,
     holidayDutyCount,
     totalDutyCount: weekdayDutyCount + holidayDutyCount,

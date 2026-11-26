@@ -15,6 +15,7 @@ export default function SchedulePage() {
     new Date(),
     new Date(),
   ]);
+  const [currentViewDate, setCurrentViewDate] = useState<Date>(new Date());
   const [refreshKey, setRefreshKey] = useState(0);
   const [dutyStartDate, setDutyStartDate] = useState<Date | null>(null);
   const [tempStartDate, setTempStartDate] = useState<Date | null>(null);
@@ -100,7 +101,7 @@ export default function SchedulePage() {
         <div className="flex items-center justify-between w-full max-w-md mb-4 px-1">
           <h2 className="text-xl sm:text-2xl font-bold">📅 일정 공유 캘린더</h2>
           <SalaryEstimateBadge
-            currentDate={selectedRange[0] || new Date()}
+            currentDate={currentViewDate}
             dutyStartDate={dutyStartDate}
             schedules={schedules}
           />
@@ -140,6 +141,7 @@ export default function SchedulePage() {
           onRangeChange={setSelectedRange}
           refreshKey={refreshKey}
           dutyStartDate={dutyStartDate}
+          onActiveMonthChange={(date) => setCurrentViewDate(date)}
         />
 
         <ScheduleInput

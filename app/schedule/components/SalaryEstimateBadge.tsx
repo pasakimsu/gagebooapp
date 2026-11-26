@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import {
   FirefighterRank,
-  SALARY_RATES_2026,
+  BASE_10STEP_SALARY_2026,
+  getBaseSalaryByStep,
 } from "@/lib/salaryData";
 import {
   calculateMonthlySalary,
@@ -13,7 +14,7 @@ import {
 } from "@/lib/salaryCalculator";
 
 interface Props {
-  currentDate: Date; // 캘린더에서 현재 선택된 년/월
+  currentDate: Date; // 캘린더에서 현재 선택/표시 중인 년/월
   dutyStartDate: Date;
   schedules: ScheduleItem[];
 }
@@ -40,7 +41,12 @@ export default function SalaryEstimateBadge({
 }: Props) {
   const [userId, setUserId] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+
+  // 계급 & 호봉 설정
   const [rank, setRank] = useState<FirefighterRank>("소방교");
+  const [step, setStep] = useState<number>(10);
+  const [customBaseSalary, setCustomBaseSalary] = useState<string>("");
+
   const [showAdjust, setShowAdjust] = useState(false);
 
   // 수동 수치 조절
@@ -53,8 +59,18 @@ export default function SalaryEstimateBadge({
       setUserId(storedUser);
 
       const storedRank = localStorage.getItem("firefighterRank") as FirefighterRank;
-      if (storedRank && SALARY_RATES_2026[storedRank]) {
+      if (storedRank && BASE_10STEP_SALARY_2026[storedRank]) {
         setRank(storedRank);
+      }
+
+      const storedStep = localStorage.getItem("firefighterStep");
+      if (storedStep && !isNaN(Number(storedStep))) {
+        setStep(Number(storedStep));
+      }
+
+      const storedCustomSalary = localStorage.getItem("firefighterCustomSalary");
+      if (storedCustomSalary) {
+        setCustomBaseSalary(storedCustomSalary);
       }
     }
   }, []);
@@ -66,6 +82,21 @@ export default function SalaryEstimateBadge({
     }
   };
 
+  const handleStepChange = (newStep: number) => {
+    setStep(newStep);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("firefighterStep", String(newStep));
+    }
+  };
+
+  const handleCustomSalaryChange = (val: string) => {
+    const numeric = val.replace(/[^\d]/g, "");
+    setCustomBaseSalary(numeric ? Number(numeric).toLocaleString() : "");
+    if (typeof window !== "undefined") {
+      localStorage.setItem("firefighterCustomSalary", numeric);
+    }
+  };
+
   // bak 또는 admin 계정만 노출
   if (userId !== "bak" && userId !== "admin") {
     return null;
@@ -74,17 +105,22 @@ export default function SalaryEstimateBadge({
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
 
+  const parsedCustomSalary = customBaseSalary ? Number(customBaseSalary.replace(/,/g, "")) : undefined;
+
   const result = calculateMonthlySalary({
     year,
     month,
     dutyStartDate,
     rank,
+    step,
+    customBaseSalary: parsedCustomSalary,
     schedules,
     manualLeaveCounts: manualLeaves || undefined,
     manualExtraDutyCounts: manualExtra || undefined,
   });
 
   const ranksList: FirefighterRank[] = ["소방령", "소방경", "소방위", "소방장", "소방교", "소방사"];
+  const stepsList = Array.from({ length: 31 }, (_, i) => i + 1); // 1호봉 ~ 31호봉
 
   return (
     <div className="relative inline-block text-left">
@@ -114,12 +150,12 @@ export default function SalaryEstimateBadge({
                   <h3 className="font-bold text-sm sm:text-base text-[#FFC90E]">
                     {year}년 {month}월 예상 월급 명세서
                   </h3>
-                  <p className="text-[10px] text-gray-400">3조 1교대(당비비) + 2026년 수당 단가 적용</p>
+                  <p className="text-[10px] text-gray-400">3조 1교대(당비비) + 2026년 봉급/수당 단가 적용</p>
                 </div>
               </div>
               <button
                 onClick={() => setIsOpen(false)}
-                className="w-7 h-7 rounded-full bg-gray-700/50 hover:bg-gray-600 text-gray-300 font-bold flex items-center justify-center text-sm transition"
+                className="w-7 h-7 rounded-full bg-gray-700/50 hover:bg-gray-600 text-gray-300 font-bold flex items-center justify-center text-sm transition cursor-pointer"
               >
                 ✕
               </button>
@@ -128,20 +164,61 @@ export default function SalaryEstimateBadge({
             {/* 모달 본문 (스크롤) */}
             <div className="p-5 space-y-4 overflow-y-auto text-xs sm:text-sm">
 
-              {/* 계급 선택 */}
-              <div className="flex items-center justify-between bg-[#383028] p-3 rounded-xl border border-brownBorder/30">
-                <label className="font-bold text-gray-300">계급 선택</label>
-                <select
-                  value={rank}
-                  onChange={(e) => handleRankChange(e.target.value as FirefighterRank)}
-                  className="bg-gray-800 text-amber-300 font-bold px-3 py-1.5 rounded-lg border border-brownBorder outline-none text-xs"
-                >
-                  {ranksList.map((r) => (
-                    <option key={r} value={r}>
-                      {r} (기준봉급 {SALARY_RATES_2026[r].baseSalary.toLocaleString()}원)
-                    </option>
-                  ))}
-                </select>
+              {/* 계급 & 호봉 선택 영역 */}
+              <div className="bg-[#383028] p-3.5 rounded-xl border border-brownBorder/30 space-y-2.5">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-300 mb-1">계급 선택</label>
+                    <select
+                      value={rank}
+                      onChange={(e) => handleRankChange(e.target.value as FirefighterRank)}
+                      className="w-full bg-gray-800 text-amber-300 font-bold px-2.5 py-1.5 rounded-lg border border-brownBorder outline-none text-xs"
+                    >
+                      {ranksList.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-300 mb-1">호봉 선택 (1~31호봉)</label>
+                    <select
+                      value={step}
+                      onChange={(e) => handleStepChange(Number(e.target.value))}
+                      className="w-full bg-gray-800 text-amber-300 font-bold px-2.5 py-1.5 rounded-lg border border-brownBorder outline-none text-xs"
+                    >
+                      {stepsList.map((s) => (
+                        <option key={s} value={s}>
+                          {s}호봉 ({getBaseSalaryByStep(rank, s).toLocaleString()}원)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* 사용자 지정 기본급 수동 입력 (선택) */}
+                <div className="pt-2 border-t border-brownBorder/20">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-[11px] text-gray-400">기본급 직접 입력 (선택)</label>
+                    {customBaseSalary && (
+                      <button
+                        onClick={() => handleCustomSalaryChange("")}
+                        className="text-[10px] text-rose-300 hover:underline"
+                      >
+                        자동 호봉으로 초기화
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    placeholder={`기본 호봉가: ${getBaseSalaryByStep(rank, step).toLocaleString()}원`}
+                    value={customBaseSalary}
+                    onChange={(e) => handleCustomSalaryChange(e.target.value)}
+                    className="w-full mt-1 p-2 rounded-lg bg-gray-900 text-white border border-brownBorder/50 text-xs outline-none focus:ring-1 focus:ring-amber-400 placeholder-gray-500"
+                  />
+                </div>
               </div>
 
               {/* 달력 자동 집계 현황 */}
@@ -168,7 +245,7 @@ export default function SalaryEstimateBadge({
               {/* 세부 수당 계산 내역 */}
               <div className="bg-[#3a312a] p-4 rounded-xl border border-brownBorder/30 space-y-2.5">
                 <p className="font-bold text-gray-300 text-xs border-b border-brownBorder/20 pb-2">
-                  📊 예상 수당 세부 명세서 (세전)
+                  📊 {rank} {step}호봉 수당 세부 명세서 (세전)
                 </p>
 
                 <div className="space-y-2 text-xs">
@@ -209,7 +286,7 @@ export default function SalaryEstimateBadge({
 
                 {/* 최종 합계 */}
                 <div className="pt-3 border-t border-brownBorder/40 flex flex-col items-end gap-1">
-                  <p className="text-[11px] text-gray-400 font-medium">당월 예상 총 수령액 (세전)</p>
+                  <p className="text-[11px] text-gray-400 font-medium">{year}년 {month}월 예상 총 수령액 (세전)</p>
                   <p className="text-lg sm:text-xl font-black text-[#FFC90E]">
                     {result.estimatedTotalSalary.toLocaleString()}원
                   </p>
@@ -223,7 +300,7 @@ export default function SalaryEstimateBadge({
               <div className="border border-brownBorder/20 rounded-xl overflow-hidden">
                 <button
                   onClick={() => setShowAdjust(!showAdjust)}
-                  className="w-full p-2.5 bg-[#383028] hover:bg-[#423930] text-gray-300 font-bold text-xs flex justify-between items-center transition"
+                  className="w-full p-2.5 bg-[#383028] hover:bg-[#423930] text-gray-300 font-bold text-xs flex justify-between items-center transition cursor-pointer"
                 >
                   <span>⚙️ 연가 및 대기근무 횟수 수동 조절</span>
                   <span>{showAdjust ? "▲ 접기" : "▼ 펼치기"}</span>
@@ -245,7 +322,7 @@ export default function SalaryEstimateBadge({
                                     return { ...curr, [k]: Math.max(0, curr[k] - 1) };
                                   })
                                 }
-                                className="w-5 h-5 bg-gray-700 text-white rounded font-bold"
+                                className="w-5 h-5 bg-gray-700 text-white rounded font-bold cursor-pointer"
                               >
                                 -
                               </button>
@@ -259,7 +336,7 @@ export default function SalaryEstimateBadge({
                                     return { ...curr, [k]: curr[k] + 1 };
                                   })
                                 }
-                                className="w-5 h-5 bg-gray-700 text-white rounded font-bold"
+                                className="w-5 h-5 bg-gray-700 text-white rounded font-bold cursor-pointer"
                               >
                                 +
                               </button>
@@ -283,7 +360,7 @@ export default function SalaryEstimateBadge({
                                     return { ...curr, [k]: Math.max(0, curr[k] - 1) };
                                   })
                                 }
-                                className="w-5 h-5 bg-gray-700 text-white rounded font-bold"
+                                className="w-5 h-5 bg-gray-700 text-white rounded font-bold cursor-pointer"
                               >
                                 -
                               </button>
@@ -297,7 +374,7 @@ export default function SalaryEstimateBadge({
                                     return { ...curr, [k]: curr[k] + 1 };
                                   })
                                 }
-                                className="w-5 h-5 bg-gray-700 text-white rounded font-bold"
+                                className="w-5 h-5 bg-gray-700 text-white rounded font-bold cursor-pointer"
                               >
                                 +
                               </button>
@@ -313,7 +390,7 @@ export default function SalaryEstimateBadge({
                           setManualLeaves(null);
                           setManualExtra(null);
                         }}
-                        className="w-full py-1.5 bg-gray-700 text-gray-200 rounded font-bold text-[10px] hover:bg-gray-600 transition"
+                        className="w-full py-1.5 bg-gray-700 text-gray-200 rounded font-bold text-[10px] hover:bg-gray-600 transition cursor-pointer"
                       >
                         🔄 자동 감지값으로 초기화
                       </button>
@@ -328,7 +405,7 @@ export default function SalaryEstimateBadge({
             <div className="p-3 bg-[#3a312a] border-t border-brownBorder/30 text-center">
               <button
                 onClick={() => setIsOpen(false)}
-                className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs shadow transition active:scale-95"
+                className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs shadow transition active:scale-95 cursor-pointer"
               >
                 확인 및 닫기
               </button>
