@@ -69,7 +69,7 @@ export default function CalculPage() {
   useEffect(() => {
     const storedUserId = localStorage.getItem("userId");
     if (!storedUserId) {
-      router.push("/login");
+      router.push("/");
     } else {
       setUserId(storedUserId);
       fetchUserBudgets(year, month);

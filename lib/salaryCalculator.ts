@@ -1,0 +1,176 @@
+import {
+  FirefighterRank,
+  SALARY_RATES_2026,
+  calculateDutyShiftPay,
+  calculateLeaveDeduction,
+  calculateExtraDutyPay,
+} from "./salaryData";
+
+export interface ScheduleItem {
+  id?: string;
+  date: string; // YYYY-MM-DD 또는 YYYY-M-D
+  content: string;
+}
+
+export interface LeaveCounts {
+  당번연가: number;
+  야간연가: number;
+  주간연가: number;
+}
+
+export interface ExtraDutyCounts {
+  당번대기: number;
+  야간대기: number;
+  주간대기: number;
+}
+
+export interface SalaryCalculationResult {
+  year: number;
+  month: number;
+  rank: FirefighterRank;
+  baseSalary: number; // 기준 봉급 (원)
+  weekdayDutyCount: number; // 평일 당번 횟수
+  holidayDutyCount: number; // 휴일/주말 당번 횟수
+  totalDutyCount: number; // 총 당번 횟수
+  weekdayDutyPay: number; // 평일 당번 수당 (원)
+  holidayDutyPay: number; // 휴일 당번 수당 (원)
+  totalDutyPay: number; // 당번 근무 수당 총액 (원)
+  leaveCounts: LeaveCounts; // 감지/설정된 연가 횟수
+  leaveDeductionTotal: number; // 연가 차감 총액 (원)
+  extraDutyCounts: ExtraDutyCounts; // 감지/설정된 대기근무 횟수
+  extraDutyPayTotal: number; // 대기근무 수당 총액 (원)
+  estimatedTotalSalary: number; // 당월 예상 총 수령액 (세전 원)
+}
+
+/**
+ * 특정 날짜의 3조 1교대(당비비) 근무 구분 반환
+ */
+export function getDutyLabel(date: Date, dutyStartDate: Date): "당번" | "비번" {
+  const start = new Date(dutyStartDate);
+  const target = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  target.setHours(0, 0, 0, 0);
+  const diff = Math.floor((target.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  const index = ((diff % 3) + 3) % 3;
+  return index === 0 ? "당번" : "비번";
+}
+
+/**
+ * 주말(토/일) 여부 확인
+ */
+export function isWeekend(date: Date): boolean {
+  const day = date.getDay();
+  return day === 0 || day === 6;
+}
+
+/**
+ * 날짜 객체를 YYYY-MM-DD 및 YYYY-M-D 형태로 포맷
+ */
+export function formatDateFormats(date: Date): { std: string; old: string } {
+  const y = date.getFullYear();
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  const std = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const old = `${y}-${m}-${d}`;
+  return { std, old };
+}
+
+/**
+ * 당월 예상 월급 및 수당 계산 함수
+ */
+export function calculateMonthlySalary({
+  year,
+  month,
+  dutyStartDate,
+  rank = "소방교",
+  schedules = [],
+  manualLeaveCounts,
+  manualExtraDutyCounts,
+}: {
+  year: number;
+  month: number;
+  dutyStartDate: Date;
+  rank?: FirefighterRank;
+  schedules?: ScheduleItem[];
+  manualLeaveCounts?: LeaveCounts;
+  manualExtraDutyCounts?: ExtraDutyCounts;
+}): SalaryCalculationResult {
+  const rate = SALARY_RATES_2026[rank] || SALARY_RATES_2026["소방교"];
+
+  // 1. 당월 일수 계산 및 근무 스캔
+  const daysInMonth = new Date(year, month, 0).getDate();
+  let weekdayDutyCount = 0;
+  let holidayDutyCount = 0;
+
+  const autoLeaveCounts: LeaveCounts = { 당번연가: 0, 야간연가: 0, 주간연가: 0 };
+  const autoExtraDutyCounts: ExtraDutyCounts = { 당번대기: 0, 야간대기: 0, 주간대기: 0 };
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(year, month - 1, day);
+    const { std, old } = formatDateFormats(date);
+    const label = getDutyLabel(date, dutyStartDate);
+
+    if (label === "당번") {
+      if (isWeekend(date)) {
+        holidayDutyCount++;
+      } else {
+        weekdayDutyCount++;
+      }
+    }
+
+    // 2. 일정 감지
+    const daySchedules = schedules.filter((s) => s.date === std || s.date === old);
+    for (const sched of daySchedules) {
+      const text = sched.content.trim();
+
+      // 연가 키워드 감지
+      if (text.includes("당번연가") || text.includes("연가(당번)")) autoLeaveCounts.당번연가++;
+      else if (text.includes("야간연가") || text.includes("연가(야간)")) autoLeaveCounts.야간연가++;
+      else if (text.includes("주간연가") || text.includes("연가(주간)")) autoLeaveCounts.주간연가++;
+
+      // 대기/희망근무 키워드 감지
+      if (text.includes("당번대기") || text.includes("대기(당번)") || text.includes("희망(당번)")) autoExtraDutyCounts.당번대기++;
+      else if (text.includes("야간대기") || text.includes("대기(야간)") || text.includes("희망(야간)")) autoExtraDutyCounts.야간대기++;
+      else if (text.includes("주간대기") || text.includes("대기(주간)") || text.includes("희망(주간)")) autoExtraDutyCounts.주간대기++;
+    }
+  }
+
+  // 사용자가 수동 설정한 값이 있으면 사용, 없으면 자동 스캔값 사용
+  const leaveCounts = manualLeaveCounts || autoLeaveCounts;
+  const extraDutyCounts = manualExtraDutyCounts || autoExtraDutyCounts;
+
+  // 3. 수당 산출
+  const weekdayDutyPay = weekdayDutyCount * calculateDutyShiftPay(rate, false);
+  const holidayDutyPay = holidayDutyCount * calculateDutyShiftPay(rate, true);
+  const totalDutyPay = weekdayDutyPay + holidayDutyPay;
+
+  const leaveDeductionTotal =
+    leaveCounts.당번연가 * calculateLeaveDeduction(rate, "당번연가") +
+    leaveCounts.야간연가 * calculateLeaveDeduction(rate, "야간연가") +
+    leaveCounts.주간연가 * calculateLeaveDeduction(rate, "주간연가");
+
+  const extraDutyPayTotal =
+    extraDutyCounts.당번대기 * calculateExtraDutyPay(rate, "당번대기") +
+    extraDutyCounts.야간대기 * calculateExtraDutyPay(rate, "야간대기") +
+    extraDutyCounts.주간대기 * calculateExtraDutyPay(rate, "주간대기");
+
+  const estimatedTotalSalary = rate.baseSalary + totalDutyPay + extraDutyPayTotal - leaveDeductionTotal;
+
+  return {
+    year,
+    month,
+    rank,
+    baseSalary: rate.baseSalary,
+    weekdayDutyCount,
+    holidayDutyCount,
+    totalDutyCount: weekdayDutyCount + holidayDutyCount,
+    weekdayDutyPay,
+    holidayDutyPay,
+    totalDutyPay,
+    leaveCounts,
+    leaveDeductionTotal,
+    extraDutyCounts,
+    extraDutyPayTotal,
+    estimatedTotalSalary,
+  };
+}

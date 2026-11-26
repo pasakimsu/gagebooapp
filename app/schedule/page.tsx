@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import CalendarView from "./components/CalendarView";
 import ScheduleInput from "./components/ScheduleInput";
 import ScheduleList from "./components/ScheduleList";
+import SalaryEstimateBadge from "./components/SalaryEstimateBadge";
 import AuthGuard from "@/components/AuthGuard";
 import NotificationPermission from "@/components/NotificationPermission";
-import { db, doc, getDoc, onSnapshot, setDoc } from "@/lib/firebase";
+import { db, doc, getDoc, onSnapshot, setDoc, collection } from "@/lib/firebase";
+import { ScheduleItem } from "@/lib/salaryCalculator";
 
 export default function SchedulePage() {
   const [selectedRange, setSelectedRange] = useState<[Date, Date]>([
@@ -17,6 +19,7 @@ export default function SchedulePage() {
   const [dutyStartDate, setDutyStartDate] = useState<Date | null>(null);
   const [tempStartDate, setTempStartDate] = useState<Date | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
 
   const handleRefresh = () => {
     setRefreshKey((prev) => prev + 1);
@@ -50,6 +53,17 @@ export default function SchedulePage() {
     };
 
     initOrSubscribe();
+
+    // 실시간 일정 수신 (월급 수당 계산용)
+    const unsubSchedules = onSnapshot(collection(db, "schedules"), (snap) => {
+      const data = snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<ScheduleItem, "id">),
+      }));
+      setSchedules(data);
+    });
+
+    return () => unsubSchedules();
   }, []);
 
   const handleConfirmDutyDate = async () => {
@@ -80,8 +94,17 @@ export default function SchedulePage() {
 
   return (
     <AuthGuard>
-      <div className="flex flex-col items-center min-h-screen justify-center bg-[#2f2a25] text-white p-6">
-        <h2 className="text-2xl font-bold mb-4">📅 일정 공유 캘린더</h2>
+      <div className="flex flex-col items-center min-h-screen justify-start bg-[#2f2a25] text-white p-4 sm:p-6">
+
+        {/* 상단 타이틀 & bak 전용 예상 월급 라벨 배지 */}
+        <div className="flex items-center justify-between w-full max-w-md mb-4 px-1">
+          <h2 className="text-xl sm:text-2xl font-bold">📅 일정 공유 캘린더</h2>
+          <SalaryEstimateBadge
+            currentDate={selectedRange[0] || new Date()}
+            dutyStartDate={dutyStartDate}
+            schedules={schedules}
+          />
+        </div>
 
         <NotificationPermission />
 
@@ -101,11 +124,11 @@ export default function SchedulePage() {
                   setTempStartDate(newDate);
                 }
               }}
-              className="w-full p-2 mb-2 rounded bg-gray-700 text-white"
+              className="w-full p-2 mb-2 rounded bg-gray-700 text-white text-sm"
             />
             <button
               onClick={handleConfirmDutyDate}
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded transition duration-300"
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded text-sm transition duration-300"
             >
               ✅ 기준일자 확정
             </button>
