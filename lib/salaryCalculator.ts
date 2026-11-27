@@ -3,7 +3,6 @@ import {
   TaxRateOption,
   DeductionBreakdown,
   getRankSalaryRate,
-  calculateLeaveDeduction,
   calculateExtraDutyPay,
   calculateDeductions,
 } from "./salaryData";
@@ -47,14 +46,14 @@ export interface SalaryCalculationResult {
   effectiveDutyCount: number; // 실제 근무 당번 횟수 (총당번 - 당번연가)
   totalDutyHours: number; // 실제 근무 당번 시수 (N회 × 24h)
   regularWorkHours: number; // 봉급에 포함된 월 정규근무시간 (166h)
-  overtimeHours: number; // 시간외 인정시간 (실제당번시수 - 166h)
+  partialLeaveHours: number; // 주간/야간연가(건강검진 등) 차감 시수 (12h/회)
+  overtimeHours: number; // 시간외 인정시간 (실제당번시수 - 166h - 연가시수)
   nightHours: number; // 야간수당 인정시간 (실제당번횟수 × 8h)
   overtimePay: number; // 시간외수당 금액 (원)
   nightPay: number; // 야간수당 금액 (원)
   holidayDutyPay: number; // 휴일수당 금액 (원)
   totalDutyPay: number; // 당번 초과근무 수당 총액 (원)
   leaveCounts: LeaveCounts; // 감지/설정된 연가 횟수
-  leaveDeductionTotal: number; // 연가 차감 총액 (원)
   extraDutyCounts: ExtraDutyCounts; // 감지/설정된 대기근무 횟수
   extraDutyPayTotal: number; // 대기근무 수당 총액 (원)
   fixedAllowance: number; // 기타 고정수당 합계 (직급보조비/급식비/위험수당 등)
@@ -209,8 +208,11 @@ export function calculateMonthlySalary({
   const totalDutyHours = effectiveDutyCount * 24;
   const regularWorkHours = 166;
 
-  // 시간외 인정시간 = 실제 근무 당번 시수 (N회 × 24h) - 정규근무시간 (166h)
-  const overtimeHours = Math.max(0, totalDutyHours - regularWorkHours);
+  // 주간연가/야간연가(건강검진, 공가 등) 사용으로 인한 차감 시수 (1회당 12시간)
+  const partialLeaveHours = leaveCounts.주간연가 * 12 + leaveCounts.야간연가 * 12;
+
+  // 시간외 인정시간 = 실제 근무 당번 시수 (N회 × 24h) - 정규근무시간 (166h) - 부분연가 차감 시수
+  const overtimeHours = Math.max(0, totalDutyHours - regularWorkHours - partialLeaveHours);
   const overtimePay = overtimeHours * rate.hourlyOvertime;
 
   // 야간수당 인정시간 = 실제 근무 당번 횟수 × 8h (22:00 ~ 06:00)
@@ -224,18 +226,13 @@ export function calculateMonthlySalary({
   // 당번 초과근무 수당 총액 = 시간외수당 + 야간수당 + 휴일수당
   const totalDutyPay = overtimePay + nightPay + holidayDutyPay;
 
-  // 부분 연가(주간/야간연가, 건강검진, 공가 등) 금액 차감액
-  const leaveDeductionTotal =
-    leaveCounts.야간연가 * calculateLeaveDeduction(rate, "야간연가") +
-    leaveCounts.주간연가 * calculateLeaveDeduction(rate, "주간연가");
-
   const extraDutyPayTotal =
     extraDutyCounts.당번대기 * calculateExtraDutyPay(rate, "당번대기") +
     extraDutyCounts.야간대기 * calculateExtraDutyPay(rate, "야간대기") +
     extraDutyCounts.주간대기 * calculateExtraDutyPay(rate, "주간대기");
 
-  // 세전 보수 총계 = 봉급 + 당번초과수당 + 대기수당 - 연가차감액 + 기타고정수당
-  const grossTotalSalary = rate.baseSalary + totalDutyPay + extraDutyPayTotal - leaveDeductionTotal + fixedAllowance;
+  // 세전 보수 총계 = 봉급 + 당번초과수당 + 대기수당 + 기타고정수당
+  const grossTotalSalary = rate.baseSalary + totalDutyPay + extraDutyPayTotal + fixedAllowance;
 
   // 4. 공제 항목 및 실수령액 산출
   const deductions = calculateDeductions({
@@ -265,6 +262,7 @@ export function calculateMonthlySalary({
     effectiveDutyCount,
     totalDutyHours,
     regularWorkHours,
+    partialLeaveHours,
     overtimeHours,
     nightHours,
     overtimePay,
@@ -272,7 +270,7 @@ export function calculateMonthlySalary({
     holidayDutyPay,
     totalDutyPay,
     leaveCounts,
-    leaveDeductionTotal,
+    leaveDeductionTotal: 0,
     extraDutyCounts,
     extraDutyPayTotal,
     fixedAllowance,
