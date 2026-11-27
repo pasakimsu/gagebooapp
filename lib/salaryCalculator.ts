@@ -40,6 +40,7 @@ export interface SalaryCalculationResult {
   dailyHoliday: number; // 휴일수당 단가
   weekdayDutyCount: number; // 스케줄 상 평일 당번 횟수
   holidayDutyCount: number; // 스케줄 상 휴일/주말 당번 횟수
+  effectiveHolidayDutyCount: number; // 실제 근무한 휴일 당번 횟수 (휴일연가 차감 반영)
   totalDutyCount: number; // 스케줄 상 총 당번 횟수
   effectiveDutyCount: number; // 실제 근무 당번 횟수 (총당번 - 당번연가)
   totalDutyHours: number; // 실제 근무 당번 시수 (N회 × 24h)
@@ -139,6 +140,7 @@ export function calculateMonthlySalary({
   const daysInWorkMonth = new Date(workYear, workMonth, 0).getDate();
   let weekdayDutyCount = 0;
   let holidayDutyCount = 0;
+  let autoHolidayLeaveCount = 0;
 
   const autoLeaveCounts: LeaveCounts = { 당번연가: 0, 야간연가: 0, 주간연가: 0 };
   const autoExtraDutyCounts: ExtraDutyCounts = { 당번대기: 0, 야간대기: 0, 주간대기: 0 };
@@ -147,9 +149,10 @@ export function calculateMonthlySalary({
     const date = new Date(workYear, workMonth - 1, day);
     const { std, old } = formatDateFormats(date);
     const label = getDutyLabel(date, dutyStartDate);
+    const isHol = isWeekend(date);
 
     if (label === "당번") {
-      if (isWeekend(date)) {
+      if (isHol) {
         holidayDutyCount++;
       } else {
         weekdayDutyCount++;
@@ -162,7 +165,12 @@ export function calculateMonthlySalary({
       const text = sched.content.trim();
 
       // 연가 키워드 감지
-      if (text.includes("당번연가") || text.includes("연가(당번)")) autoLeaveCounts.당번연가++;
+      if (text.includes("당번연가") || text.includes("연가(당번)")) {
+        autoLeaveCounts.당번연가++;
+        if (label === "당번" && isHol) {
+          autoHolidayLeaveCount++;
+        }
+      }
       else if (text.includes("야간연가") || text.includes("연가(야간)")) autoLeaveCounts.야간연가++;
       else if (text.includes("주간연가") || text.includes("연가(주간)")) autoLeaveCounts.주간연가++;
 
@@ -178,7 +186,6 @@ export function calculateMonthlySalary({
   const extraDutyCounts = manualExtraDutyCounts || autoExtraDutyCounts;
 
   // 3. 3조 1교대(당비비) 초과근무 수당 산출
-  // 월 정규근무시간(기본급으로 커버되는 기준시간): 약 166시간
   const totalDutyCount = weekdayDutyCount + holidayDutyCount;
 
   // 실제 근무 당번 횟수 (스케줄 상 당번 횟수 - 당번연가 횟수)
@@ -194,8 +201,9 @@ export function calculateMonthlySalary({
   const nightHours = effectiveDutyCount * 8;
   const nightPay = nightHours * rate.hourlyNight;
 
-  // 휴일수당 인정일수 = 휴일/주말 당번 횟수
-  const holidayDutyPay = holidayDutyCount * rate.dailyHoliday;
+  // 실제 근무 휴일 당번 횟수 = 스케줄상 휴일당번 횟수 - 휴일 당번연가 횟수
+  const effectiveHolidayDutyCount = Math.max(0, holidayDutyCount - autoHolidayLeaveCount);
+  const holidayDutyPay = effectiveHolidayDutyCount * rate.dailyHoliday;
 
   // 당번 초과근무 수당 총액 = 시간외수당 + 야간수당 + 휴일수당
   const totalDutyPay = overtimePay + nightPay + holidayDutyPay;
@@ -236,6 +244,7 @@ export function calculateMonthlySalary({
     dailyHoliday: rate.dailyHoliday,
     weekdayDutyCount,
     holidayDutyCount,
+    effectiveHolidayDutyCount,
     totalDutyCount,
     effectiveDutyCount,
     totalDutyHours,

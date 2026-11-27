@@ -364,7 +364,7 @@ export default function SalaryEstimateBadge({
                       <span>{result.nightPay.toLocaleString()}원</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>• 휴일수당 ({result.holidayDutyCount}일 × {result.dailyHoliday.toLocaleString()}원)</span>
+                      <span>• 휴일수당 ({result.effectiveHolidayDutyCount}일 × {result.dailyHoliday.toLocaleString()}원)</span>
                       <span>{result.holidayDutyPay.toLocaleString()}원</span>
                     </div>
                   </div>
