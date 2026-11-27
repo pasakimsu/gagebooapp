@@ -1,9 +1,12 @@
 import {
   FirefighterRank,
+  TaxRateOption,
+  DeductionBreakdown,
   getRankSalaryRate,
   calculateDutyShiftPay,
   calculateLeaveDeduction,
   calculateExtraDutyPay,
+  calculateDeductions,
 } from "./salaryData";
 
 export interface ScheduleItem {
@@ -29,7 +32,7 @@ export interface SalaryCalculationResult {
   month: number;
   rank: FirefighterRank;
   step: number;
-  baseSalary: number; // 기준 봉급 (원)
+  baseSalary: number; // 법정 지정 봉급 (원)
   hourlyOvertime: number; // 시간외수당 단가
   hourlyNight: number; // 야간수당 단가
   dailyHoliday: number; // 휴일수당 단가
@@ -43,7 +46,11 @@ export interface SalaryCalculationResult {
   leaveDeductionTotal: number; // 연가 차감 총액 (원)
   extraDutyCounts: ExtraDutyCounts; // 감지/설정된 대기근무 횟수
   extraDutyPayTotal: number; // 대기근무 수당 총액 (원)
-  estimatedTotalSalary: number; // 당월 예상 총 수령액 (세전 원)
+  fixedAllowance: number; // 기타 고정수당 합계 (직급보조비/급식비/위험수당 등)
+  grossTotalSalary: number; // 세전 보수 총계 (봉급 + 초과수당 + 고정수당)
+  taxRateOption: TaxRateOption; // 원천징수 세율 (80% / 100% / 120%)
+  deductions: DeductionBreakdown; // 세부 공제 내역 (기여금/건보료/소득세/기타공제)
+  netTotalSalary: number; // 예상 실수령액 (세후 원 = 세전보수총계 - 총공제액)
 }
 
 /**
@@ -80,15 +87,18 @@ export function formatDateFormats(date: Date): { std: string; old: string } {
 }
 
 /**
- * 당월 예상 월급 및 수당 계산 함수
+ * 당월 예상 월급, 공제 내역 및 실수령액 계산 함수
  */
 export function calculateMonthlySalary({
   year,
   month,
   dutyStartDate,
   rank = "소방교",
-  step = 10,
+  step = 11,
   customBaseSalary,
+  fixedAllowance = 870490,
+  taxRateOption = 80,
+  manualOtherDeductions,
   schedules = [],
   manualLeaveCounts,
   manualExtraDutyCounts,
@@ -99,6 +109,9 @@ export function calculateMonthlySalary({
   rank?: FirefighterRank;
   step?: number;
   customBaseSalary?: number;
+  fixedAllowance?: number;
+  taxRateOption?: TaxRateOption;
+  manualOtherDeductions?: number;
   schedules?: ScheduleItem[];
   manualLeaveCounts?: LeaveCounts;
   manualExtraDutyCounts?: ExtraDutyCounts;
@@ -162,7 +175,17 @@ export function calculateMonthlySalary({
     extraDutyCounts.야간대기 * calculateExtraDutyPay(rate, "야간대기") +
     extraDutyCounts.주간대기 * calculateExtraDutyPay(rate, "주간대기");
 
-  const estimatedTotalSalary = rate.baseSalary + totalDutyPay + extraDutyPayTotal - leaveDeductionTotal;
+  // 세전 보수 총계 = 기본급 + 초과수당 + 희망대기수당 - 연가차감액 + 기타고정수당
+  const grossTotalSalary = rate.baseSalary + totalDutyPay + extraDutyPayTotal - leaveDeductionTotal + fixedAllowance;
+
+  // 4. 공제 항목 및 실수령액 산출
+  const deductions = calculateDeductions({
+    grossSalary: grossTotalSalary,
+    taxRateOption,
+    manualOtherDeductions,
+  });
+
+  const netTotalSalary = grossTotalSalary - deductions.totalDeductions;
 
   return {
     year,
@@ -183,6 +206,10 @@ export function calculateMonthlySalary({
     leaveDeductionTotal,
     extraDutyCounts,
     extraDutyPayTotal,
-    estimatedTotalSalary,
+    fixedAllowance,
+    grossTotalSalary,
+    taxRateOption,
+    deductions,
+    netTotalSalary,
   };
 }
