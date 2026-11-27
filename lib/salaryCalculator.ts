@@ -47,8 +47,8 @@ export interface SalaryCalculationResult {
   effectiveDutyCount: number; // 실제 근무 당번 횟수 (총당번 - 당번연가)
   totalDutyHours: number; // 실제 근무 당번 시수 (N회 × 24h)
   regularWorkHours: number; // 봉급에 포함된 월 정규근무시간 (166h)
-  partialLeaveHours: number; // 주간/야간연가/육아시간 차감 시수 (12h/2h/회)
-  overtimeHours: number; // 시간외 인정시간 (실제당번시수 - 166h - 연가시수)
+  partialLeaveHours: number; // 주간/야간연가/육아시간/당번연가 차감 시수
+  overtimeHours: number; // 시간외 인정시간 (기본시간외 - 연가시수)
   nightHours: number; // 야간수당 인정시간 (실제당번횟수 × 8h)
   overtimePay: number; // 시간외수당 금액 (원)
   nightPay: number; // 야간수당 금액 (원)
@@ -209,14 +209,19 @@ export function calculateMonthlySalary({
 
   // 실제 근무 당번 횟수 (스케줄 상 당번 횟수 - 당번연가 횟수)
   const effectiveDutyCount = Math.max(0, totalDutyCount - leaveCounts.당번연가);
-  const totalDutyHours = effectiveDutyCount * 24;
+  const totalDutyHours = totalDutyCount * 24; // 만근 24시간 총시수 기준
   const regularWorkHours = 166;
 
-  // 주간연가/야간연가(건강검진, 공가 등 12h) + 육아시간(1회당 2시간) 사용으로 인한 차감 시수
+  // 소방공무원 초과근무 시수 차감 지침:
+  // - 24시간 당번연가 1회당 시간외 시수는 17.5시간 차감 (24시간 중 정규 8h 제외한 초과분)
+  // - 주간/야간연가(건강검진/공가 등) 1회당 12시간 차감
+  // - 육아시간 1회당 2시간 차감
+  const dutyLeaveOvertimeDeduction = leaveCounts.당번연가 * 17.5;
   const partialLeaveHours = leaveCounts.주간연가 * 12 + leaveCounts.야간연가 * 12 + (leaveCounts.육아시간 || 0) * 2;
 
-  // 시간외 인정시간 = 실제 근무 당번 시수 (N회 × 24h) - 정규근무시간 (166h) - 부분연가 차감 시수
-  const overtimeHours = Math.max(0, totalDutyHours - regularWorkHours - partialLeaveHours);
+  // 시간외 인정시간 = 만근 시수(240h) - 정규시간(166h) - 당번연가시간외차감(17.5h/회) - 부분연가차감(12h/2h/회)
+  const baseOvertimeHours = Math.max(0, totalDutyHours - regularWorkHours);
+  const overtimeHours = Math.max(0, Math.round(baseOvertimeHours - dutyLeaveOvertimeDeduction - partialLeaveHours));
   const overtimePay = overtimeHours * rate.hourlyOvertime;
 
   // 야간수당 인정시간 = 실제 근무 당번 횟수 × 8h (22:00 ~ 06:00)
@@ -266,7 +271,7 @@ export function calculateMonthlySalary({
     effectiveDutyCount,
     totalDutyHours,
     regularWorkHours,
-    partialLeaveHours,
+    partialLeaveHours: Math.round(dutyLeaveOvertimeDeduction + partialLeaveHours),
     overtimeHours,
     nightHours,
     overtimePay,

@@ -18,23 +18,21 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 // 백그라운드 메시지 핸들러
-// Note: notification 페이로드가 포함된 푸시는 FCM SDK에서 자동 알림 창을 띄우므로,
-// 수동 showNotification 중복 호출을 제거하여 알림이 1개만 오도록 고정합니다.
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
 
-  // notification 객체가 없는 data-only 푸시인 경우에만 수동으로 1회 표시
-  if (!payload.notification && payload.data) {
-    const notificationTitle = payload.data.title || "우리집 가계부";
-    const notificationOptions = {
-      body: payload.data.body || "새로운 일정이 등록되었습니다.",
-      icon: '/next.svg',
-      badge: '/next.svg',
-      tag: 'family-notification',
-      data: payload.data
-    };
-    return self.registration.showNotification(notificationTitle, notificationOptions);
-  }
+  const notificationTitle = payload.notification?.title || payload.data?.title || "우리집 가계부";
+  const notificationBody = payload.notification?.body || payload.data?.body || "새로운 일정이 등록되었습니다.";
+
+  const notificationOptions = {
+    body: notificationBody,
+    icon: '/next.svg',
+    badge: '/next.svg',
+    tag: 'family-notification', // tag 속성으로 동일 알림 중복 결합
+    data: payload.data || payload.notification
+  };
+
+  return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
 // 알림 클릭 시 앱 화면으로 즉시 전환
