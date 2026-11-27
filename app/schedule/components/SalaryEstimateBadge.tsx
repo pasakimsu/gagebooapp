@@ -43,7 +43,7 @@ export default function SalaryEstimateBadge({
   const [userId, setUserId] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
 
-  // 계급 & 호봉 설정 (기본값: 소방교 11호봉 - 법정 [별표 10] 3,012,000원)
+  // 계급 & 호봉 설정 (기본값: 소방교 11호봉)
   const [rank, setRank] = useState<FirefighterRank>("소방교");
   const [step, setStep] = useState<number>(11);
   const [customBaseSalary, setCustomBaseSalary] = useState<string>("");
@@ -53,6 +53,9 @@ export default function SalaryEstimateBadge({
 
   // 원천징수 세율 선택 (80% / 100% / 120%)
   const [taxRateOption, setTaxRateOption] = useState<TaxRateOption>(80);
+
+  // 초과수당 집계 방식 (true = 전월 근무실적 연동 [실제 급여 방식], false = 당월 근무실적 연동)
+  const [usePreviousMonthSchedule, setUsePreviousMonthSchedule] = useState<boolean>(true);
 
   // 기타 공제액 수동 조절 (기본값: 약 414,000원)
   const [manualOtherDeductionStr, setManualOtherDeductionStr] = useState<string>("414,000");
@@ -77,7 +80,7 @@ export default function SalaryEstimateBadge({
       if (storedStep && !isNaN(Number(storedStep))) {
         setStep(Number(storedStep));
       } else {
-        setStep(11); // 소방교 11호봉 기본값
+        setStep(11);
       }
 
       const storedCustomSalary = localStorage.getItem("firefighterCustomSalary");
@@ -98,6 +101,11 @@ export default function SalaryEstimateBadge({
       const storedOtherDed = localStorage.getItem("firefighterOtherDeduction");
       if (storedOtherDed !== null) {
         setManualOtherDeductionStr(storedOtherDed);
+      }
+
+      const storedPrevMode = localStorage.getItem("usePreviousMonthSchedule");
+      if (storedPrevMode !== null) {
+        setUsePreviousMonthSchedule(storedPrevMode === "true");
       }
     }
   }, []);
@@ -147,6 +155,13 @@ export default function SalaryEstimateBadge({
     }
   };
 
+  const handlePrevModeToggle = (mode: boolean) => {
+    setUsePreviousMonthSchedule(mode);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("usePreviousMonthSchedule", String(mode));
+    }
+  };
+
   // bak 또는 admin 계정만 노출
   if (userId !== "bak" && userId !== "admin") {
     return null;
@@ -163,6 +178,7 @@ export default function SalaryEstimateBadge({
     year,
     month,
     dutyStartDate,
+    usePreviousMonthSchedule,
     rank,
     step,
     customBaseSalary: parsedCustomSalary,
@@ -179,7 +195,7 @@ export default function SalaryEstimateBadge({
 
   return (
     <div className="relative inline-block text-left">
-      {/* 1. 우측 상단 컴팩트 라벨 배지 (실수령액 기준 표기) */}
+      {/* 1. 우측 상단 컴팩트 라벨 배지 */}
       <button
         onClick={() => setIsOpen(true)}
         className="flex items-center gap-1.5 px-3 py-1.5 bg-[#3a312a] hover:bg-[#4a3f37] border border-[#FFC90E]/40 text-[#FFC90E] rounded-full text-xs font-bold shadow-md transition active:scale-95 cursor-pointer"
@@ -205,7 +221,11 @@ export default function SalaryEstimateBadge({
                   <h3 className="font-bold text-sm sm:text-base text-[#FFC90E]">
                     {year}년 {month}월 예상 보수 및 실수령액 명세서
                   </h3>
-                  <p className="text-[10px] text-gray-400">공무원보수규정 [별표 10] 원본 + 공제 내역 적용</p>
+                  <p className="text-[10px] text-amber-200">
+                    {result.usePreviousMonthSchedule
+                      ? `📌 ${result.workMonth}월 근무실적 연동 (${year}년 ${month}월 20일 지급분)`
+                      : `📅 ${month}월 당월 근무실적 연동`}
+                  </p>
                 </div>
               </div>
               <button
@@ -218,6 +238,36 @@ export default function SalaryEstimateBadge({
 
             {/* 모달 본문 (스크롤) */}
             <div className="p-5 space-y-4 overflow-y-auto text-xs sm:text-sm">
+
+              {/* 수당 집계 방식 선택 (전월 실적 연동 vs 당월 실적) */}
+              <div className="bg-[#3d3329] p-3 rounded-xl border border-amber-500/30 space-y-1">
+                <label className="block text-[11px] font-bold text-amber-200">초과수당 집계 방식</label>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    onClick={() => handlePrevModeToggle(true)}
+                    className={`p-2 rounded-lg text-xs font-bold transition cursor-pointer text-left border ${
+                      usePreviousMonthSchedule
+                        ? "bg-amber-600 border-amber-400 text-white shadow"
+                        : "bg-gray-800 border-brownBorder/50 text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    <p>📌 전월({month === 1 ? 12 : month - 1}월) 실적 연동</p>
+                    <p className="text-[9px] font-normal opacity-80 mt-0.5">실제 급여 지급 방식 ({month}월 20일 지급분)</p>
+                  </button>
+
+                  <button
+                    onClick={() => handlePrevModeToggle(false)}
+                    className={`p-2 rounded-lg text-xs font-bold transition cursor-pointer text-left border ${
+                      !usePreviousMonthSchedule
+                        ? "bg-amber-600 border-amber-400 text-white shadow"
+                        : "bg-gray-800 border-brownBorder/50 text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    <p>📅 당월({month}월) 실적 연동</p>
+                    <p className="text-[9px] font-normal opacity-80 mt-0.5">{month}월 달력 일정 직접 연동</p>
+                  </button>
+                </div>
+              </div>
 
               {/* 계급 & 호봉 선택 영역 */}
               <div className="bg-[#383028] p-3.5 rounded-xl border border-brownBorder/30 space-y-2.5">
@@ -317,7 +367,7 @@ export default function SalaryEstimateBadge({
               {/* 달력 자동 집계 현황 */}
               <div className="bg-[#383028]/60 p-3.5 rounded-xl border border-brownBorder/20 space-y-1.5">
                 <p className="font-bold text-amber-200 text-xs flex items-center gap-1.5">
-                  <span>📅</span> {year}년 {month}월 달력 자동 감지 현황
+                  <span>📅</span> {result.workYear}년 {result.workMonth}월 근무실적 감지 현황 ({month}월 20일 급여분)
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-[11px] text-gray-300 pt-1">
                   <div className="bg-gray-800/40 p-2 rounded-lg">
@@ -338,7 +388,7 @@ export default function SalaryEstimateBadge({
               {/* 1. 보수 지급 내역 (세전) */}
               <div className="bg-[#3a312a] p-4 rounded-xl border border-brownBorder/30 space-y-2">
                 <p className="font-bold text-gray-300 text-xs border-b border-brownBorder/20 pb-2">
-                  📊 {rank} {step}호봉 보수 지급 내역 (세전)
+                  📊 {rank} {step}호봉 보수 지급 내역 ({month}월 지급분, 세전)
                 </p>
 
                 <div className="space-y-1.5 text-xs">
@@ -348,7 +398,7 @@ export default function SalaryEstimateBadge({
                   </div>
 
                   <div className="flex justify-between items-center text-emerald-300">
-                    <span>➕ 당번 초과근무 수당 ({result.totalDutyCount}회)</span>
+                    <span>➕ 당번 초과근무 수당 ({result.workMonth}월 {result.totalDutyCount}회 실적)</span>
                     <span className="font-bold">+{result.totalDutyPay.toLocaleString()}원</span>
                   </div>
 
@@ -422,7 +472,7 @@ export default function SalaryEstimateBadge({
 
               {/* 3. 최종 예상 실수령액 요약 */}
               <div className="bg-[#3d3329] p-4 rounded-xl border border-[#FFC90E]/40 flex flex-col items-end gap-1 shadow-lg">
-                <p className="text-xs text-amber-200 font-bold">💰 {year}년 {month}월 예상 실수령액 (세후)</p>
+                <p className="text-xs text-amber-200 font-bold">💰 {year}년 {month}월 예상 실수령액 ({result.workMonth}월 근무실적 연동)</p>
                 <p className="text-xl sm:text-2xl font-black text-[#FFC90E]">
                   {result.netTotalSalary.toLocaleString()}원
                 </p>
@@ -440,14 +490,14 @@ export default function SalaryEstimateBadge({
                   onClick={() => setShowAdjust(!showAdjust)}
                   className="w-full p-2.5 bg-[#383028] hover:bg-[#423930] text-gray-300 font-bold text-xs flex justify-between items-center transition cursor-pointer"
                 >
-                  <span>⚙️ 연가 및 대기근무 횟수 수동 조절</span>
+                  <span>⚙️ {result.workMonth}월 연가 및 대기근무 횟수 수동 조절</span>
                   <span>{showAdjust ? "▲ 접기" : "▼ 펼치기"}</span>
                 </button>
 
                 {showAdjust && (
                   <div className="p-3 bg-gray-900/40 space-y-3 text-[11px]">
                     <div>
-                      <p className="font-bold text-rose-300 mb-1.5">➖ 연가 차감 횟수</p>
+                      <p className="font-bold text-rose-300 mb-1.5">➖ {result.workMonth}월 연가 차감 횟수</p>
                       <div className="grid grid-cols-3 gap-2 text-center">
                         {(["당번연가", "야간연가", "주간연가"] as const).map((k) => (
                           <div key={k} className="bg-gray-800 p-2 rounded-lg border border-brownBorder/20">
@@ -485,7 +535,7 @@ export default function SalaryEstimateBadge({
                     </div>
 
                     <div>
-                      <p className="font-bold text-blue-300 mb-1.5">➕ 대기근무 횟수</p>
+                      <p className="font-bold text-blue-300 mb-1.5">➕ {result.workMonth}월 대기근무 횟수</p>
                       <div className="grid grid-cols-3 gap-2 text-center">
                         {(["당번대기", "야간대기", "주간대기"] as const).map((k) => (
                           <div key={k} className="bg-gray-800 p-2 rounded-lg border border-brownBorder/20">

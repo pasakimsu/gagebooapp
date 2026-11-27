@@ -28,8 +28,11 @@ export interface ExtraDutyCounts {
 }
 
 export interface SalaryCalculationResult {
-  year: number;
-  month: number;
+  year: number; // 지급년도 (예: 2026)
+  month: number; // 지급월 (예: 11월)
+  workYear: number; // 근무 실적 년도 (예: 2026)
+  workMonth: number; // 근무 실적 월 (예: 10월)
+  usePreviousMonthSchedule: boolean;
   rank: FirefighterRank;
   step: number;
   baseSalary: number; // 법정 지정 봉급 (원)
@@ -88,11 +91,13 @@ export function formatDateFormats(date: Date): { std: string; old: string } {
 
 /**
  * 당월 예상 월급, 공제 내역 및 실수령액 계산 함수
+ * (소방공무원 보수 규정: 초과근무 수당은 전월 근무 실적 기반으로 당월 20일 지급)
  */
 export function calculateMonthlySalary({
   year,
   month,
   dutyStartDate,
+  usePreviousMonthSchedule = true,
   rank = "소방교",
   step = 11,
   customBaseSalary,
@@ -106,6 +111,7 @@ export function calculateMonthlySalary({
   year: number;
   month: number;
   dutyStartDate: Date;
+  usePreviousMonthSchedule?: boolean;
   rank?: FirefighterRank;
   step?: number;
   customBaseSalary?: number;
@@ -118,16 +124,28 @@ export function calculateMonthlySalary({
 }): SalaryCalculationResult {
   const rate = getRankSalaryRate(rank, step, customBaseSalary);
 
-  // 1. 당월 일수 계산 및 근무 스캔
-  const daysInMonth = new Date(year, month, 0).getDate();
+  // 근무 실적 집계 대상 년/월 (익월 지급 규정 적용)
+  let workYear = year;
+  let workMonth = month;
+  if (usePreviousMonthSchedule) {
+    if (month === 1) {
+      workYear = year - 1;
+      workMonth = 12;
+    } else {
+      workMonth = month - 1;
+    }
+  }
+
+  // 1. 근무 실적 월의 일수 계산 및 근무 스캔
+  const daysInWorkMonth = new Date(workYear, workMonth, 0).getDate();
   let weekdayDutyCount = 0;
   let holidayDutyCount = 0;
 
   const autoLeaveCounts: LeaveCounts = { 당번연가: 0, 야간연가: 0, 주간연가: 0 };
   const autoExtraDutyCounts: ExtraDutyCounts = { 당번대기: 0, 야간대기: 0, 주간대기: 0 };
 
-  for (let day = 1; day <= daysInMonth; day++) {
-    const date = new Date(year, month - 1, day);
+  for (let day = 1; day <= daysInWorkMonth; day++) {
+    const date = new Date(workYear, workMonth - 1, day);
     const { std, old } = formatDateFormats(date);
     const label = getDutyLabel(date, dutyStartDate);
 
@@ -190,6 +208,9 @@ export function calculateMonthlySalary({
   return {
     year,
     month,
+    workYear,
+    workMonth,
+    usePreviousMonthSchedule,
     rank,
     step,
     baseSalary: rate.baseSalary,
