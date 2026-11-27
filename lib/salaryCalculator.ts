@@ -54,6 +54,7 @@ export interface SalaryCalculationResult {
   holidayDutyPay: number; // 휴일수당 금액 (원)
   totalDutyPay: number; // 당번 초과근무 수당 총액 (원)
   leaveCounts: LeaveCounts; // 감지/설정된 연가 횟수
+  leaveDeductionTotal: number; // 연가 차감 총액 (원)
   extraDutyCounts: ExtraDutyCounts; // 감지/설정된 대기근무 횟수
   extraDutyPayTotal: number; // 대기근무 수당 총액 (원)
   fixedAllowance: number; // 기타 고정수당 합계 (직급보조비/급식비/위험수당 등)
