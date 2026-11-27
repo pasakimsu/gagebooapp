@@ -13,6 +13,7 @@ export interface ScheduleItem {
   id?: string;
   date: string; // YYYY-MM-DD 또는 YYYY-M-D
   content: string;
+  userId?: string;
 }
 
 export interface LeaveCounts {
@@ -152,20 +153,42 @@ export function calculateMonthlySalary({
       }
     }
 
-    // 2. 일정 감지
+    // 2. 일정 감지 (bak 작성자 전용 일정만 스캔, 배우자 yong 일정 제외)
     const daySchedules = schedules.filter((s) => s.date === std || s.date === old);
     for (const sched of daySchedules) {
       const text = sched.content.trim();
+      const schedUser = sched.userId;
 
-      // 연가 키워드 감지
+      // 배우자(yong) 전용 일정은 명시적으로 제외
+      if (schedUser === "yong" || (text.includes("(yong)") && !text.includes("(bak)"))) {
+        continue;
+      }
+
+      // bak 작성 일정이거나 본인 연관 일정일 때만 감지
+      const isBakSchedule =
+        schedUser === "bak" ||
+        text.includes("(bak)") ||
+        (!text.includes("(yong)") && (schedUser === undefined || schedUser === null));
+
+      if (!isBakSchedule) continue;
+
+      // 연가 키워드 감지 (주간연가 + 건강검진 / 검진 / 공가 추가)
       if (text.includes("당번연가") || text.includes("연가(당번)")) {
         autoLeaveCounts.당번연가++;
         if (label === "당번" && isHol) {
           autoHolidayLeaveCount++;
         }
+      } else if (text.includes("야간연가") || text.includes("연가(야간)")) {
+        autoLeaveCounts.야간연가++;
+      } else if (
+        text.includes("주간연가") ||
+        text.includes("연가(주간)") ||
+        text.includes("건강검진") ||
+        text.includes("검진") ||
+        text.includes("공가")
+      ) {
+        autoLeaveCounts.주간연가++;
       }
-      else if (text.includes("야간연가") || text.includes("연가(야간)")) autoLeaveCounts.야간연가++;
-      else if (text.includes("주간연가") || text.includes("연가(주간)")) autoLeaveCounts.주간연가++;
 
       // 대기/희망근무 키워드 감지
       if (text.includes("당번대기") || text.includes("대기(당번)") || text.includes("희망(당번)")) autoExtraDutyCounts.당번대기++;
@@ -201,7 +224,7 @@ export function calculateMonthlySalary({
   // 당번 초과근무 수당 총액 = 시간외수당 + 야간수당 + 휴일수당
   const totalDutyPay = overtimePay + nightPay + holidayDutyPay;
 
-  // 부분 연가(주간/야간연가) 금액 차감액
+  // 부분 연가(주간/야간연가, 건강검진, 공가 등) 금액 차감액
   const leaveDeductionTotal =
     leaveCounts.야간연가 * calculateLeaveDeduction(rate, "야간연가") +
     leaveCounts.주간연가 * calculateLeaveDeduction(rate, "주간연가");
