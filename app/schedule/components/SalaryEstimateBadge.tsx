@@ -451,13 +451,13 @@ export default function SalaryEstimateBadge({
                 </p>
               </div>
 
-              {/* 연가/대기 수동 조절 어코디언 */}
+              {/* 연가/대기 수동 선택 어코디언 */}
               <div className="border border-brownBorder/20 rounded-xl overflow-hidden">
                 <button
                   onClick={() => setShowAdjust(!showAdjust)}
                   className="w-full p-2.5 bg-[#383028] hover:bg-[#423930] text-gray-300 font-bold text-xs flex justify-between items-center transition cursor-pointer"
                 >
-                  <span>⚙️ {result.workMonth}월 연가 및 대기근무 횟수 수동 조절</span>
+                  <span>⚙️ {result.workMonth}월 연가 및 대기근무 횟수 선택</span>
                   <span>{showAdjust ? "▲ 접기" : "▼ 펼치기"}</span>
                 </button>
 
@@ -556,13 +556,22 @@ export default function SalaryEstimateBadge({
 
             </div>
 
-            {/* 모달 푸터 */}
-            <div className="p-3 bg-[#3a312a] border-t border-brownBorder/30 text-center">
+            {/* 모달 푸터 (등록 / 닫기 버튼 2개로 분리) */}
+            <div className="p-3 bg-[#3a312a] border-t border-brownBorder/30 flex gap-2">
+              <button
+                onClick={() => {
+                  alert("✅ 설정 내역이 저장/등록되었습니다.");
+                  setIsOpen(false);
+                }}
+                className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs shadow transition active:scale-95 cursor-pointer"
+              >
+                💾 등록
+              </button>
               <button
                 onClick={() => setIsOpen(false)}
-                className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs shadow transition active:scale-95 cursor-pointer"
+                className="flex-1 py-2.5 bg-gray-700 hover:bg-gray-600 text-gray-200 font-bold rounded-xl text-xs shadow transition active:scale-95 cursor-pointer"
               >
-                확인 및 닫기
+                ✖ 닫기
               </button>
             </div>
 
