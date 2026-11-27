@@ -3,7 +3,6 @@ import {
   TaxRateOption,
   DeductionBreakdown,
   getRankSalaryRate,
-  calculateDutyShiftPay,
   calculateLeaveDeduction,
   calculateExtraDutyPay,
   calculateDeductions,
@@ -28,8 +27,8 @@ export interface ExtraDutyCounts {
 }
 
 export interface SalaryCalculationResult {
-  year: number; // 지급년도 (예: 2026)
-  month: number; // 지급월 (예: 11월)
+  year: number; // 급여 지급년도 (예: 2026)
+  month: number; // 급여 지급월 (예: 11월)
   workYear: number; // 근무 실적 년도 (예: 2026)
   workMonth: number; // 근무 실적 월 (예: 10월)
   usePreviousMonthSchedule: boolean;
@@ -42,9 +41,14 @@ export interface SalaryCalculationResult {
   weekdayDutyCount: number; // 평일 당번 횟수
   holidayDutyCount: number; // 휴일/주말 당번 횟수
   totalDutyCount: number; // 총 당번 횟수
-  weekdayDutyPay: number; // 평일 당번 수당 (원)
-  holidayDutyPay: number; // 휴일 당번 수당 (원)
-  totalDutyPay: number; // 당번 근무 수당 총액 (원)
+  totalDutyHours: number; // 총 당번 시수 (N회 × 24h)
+  regularWorkHours: number; // 봉급에 포함된 월 정규근무시간 (166h)
+  overtimeHours: number; // 시간외 인정시간 (총당번시수 - 166h)
+  nightHours: number; // 야간수당 인정시간 (당번횟수 × 8h)
+  overtimePay: number; // 시간외수당 금액 (원)
+  nightPay: number; // 야간수당 금액 (원)
+  holidayDutyPay: number; // 휴일수당 금액 (원)
+  totalDutyPay: number; // 당번 초과근무 수당 총액 (원)
   leaveCounts: LeaveCounts; // 감지/설정된 연가 횟수
   leaveDeductionTotal: number; // 연가 차감 총액 (원)
   extraDutyCounts: ExtraDutyCounts; // 감지/설정된 대기근무 횟수
@@ -91,17 +95,16 @@ export function formatDateFormats(date: Date): { std: string; old: string } {
 
 /**
  * 당월 예상 월급, 공제 내역 및 실수령액 계산 함수
- * (소방공무원 보수 규정: 초과근무 수당은 전월 근무 실적 기반으로 당월 20일 지급)
+ * (소방공무원 보수 규정: N월 20일 급여 수당 = N-1월 [전월 1일~31일] 실제 근무 실적 기반 계산)
  */
 export function calculateMonthlySalary({
   year,
   month,
   dutyStartDate,
-  usePreviousMonthSchedule = true,
   rank = "소방교",
   step = 11,
   customBaseSalary,
-  fixedAllowance = 870490,
+  fixedAllowance = 862490,
   taxRateOption = 80,
   manualOtherDeductions,
   schedules = [],
@@ -111,7 +114,6 @@ export function calculateMonthlySalary({
   year: number;
   month: number;
   dutyStartDate: Date;
-  usePreviousMonthSchedule?: boolean;
   rank?: FirefighterRank;
   step?: number;
   customBaseSalary?: number;
@@ -124,16 +126,12 @@ export function calculateMonthlySalary({
 }): SalaryCalculationResult {
   const rate = getRankSalaryRate(rank, step, customBaseSalary);
 
-  // 근무 실적 집계 대상 년/월 (익월 지급 규정 적용)
+  // 초과근무 수당은 전월 근무 실적으로 고정 계산 (익월 20일 급여 지급 규정)
   let workYear = year;
-  let workMonth = month;
-  if (usePreviousMonthSchedule) {
-    if (month === 1) {
-      workYear = year - 1;
-      workMonth = 12;
-    } else {
-      workMonth = month - 1;
-    }
+  let workMonth = month - 1;
+  if (month === 1) {
+    workYear = year - 1;
+    workMonth = 12;
   }
 
   // 1. 근무 실적 월의 일수 계산 및 근무 스캔
@@ -178,10 +176,25 @@ export function calculateMonthlySalary({
   const leaveCounts = manualLeaveCounts || autoLeaveCounts;
   const extraDutyCounts = manualExtraDutyCounts || autoExtraDutyCounts;
 
-  // 3. 수당 산출
-  const weekdayDutyPay = weekdayDutyCount * calculateDutyShiftPay(rate, false);
-  const holidayDutyPay = holidayDutyCount * calculateDutyShiftPay(rate, true);
-  const totalDutyPay = weekdayDutyPay + holidayDutyPay;
+  // 3. 3조 1교대(당비비) 초과근무 수당 산출
+  // 월 정규근무시간(기본급으로 커버되는 기준시간): 약 166시간
+  const totalDutyCount = weekdayDutyCount + holidayDutyCount;
+  const totalDutyHours = totalDutyCount * 24;
+  const regularWorkHours = 166;
+
+  // 시간외 인정시간 = 총 당번 시수 (N회 × 24h) - 정규근무시간 (166h)
+  const overtimeHours = Math.max(0, totalDutyHours - regularWorkHours);
+  const overtimePay = overtimeHours * rate.hourlyOvertime;
+
+  // 야간수당 인정시간 = 당번 횟수 × 8h (22:00 ~ 06:00)
+  const nightHours = totalDutyCount * 8;
+  const nightPay = nightHours * rate.hourlyNight;
+
+  // 휴일수당 인정일수 = 휴일/주말 당번 횟수
+  const holidayDutyPay = holidayDutyCount * rate.dailyHoliday;
+
+  // 당번 초과근무 수당 총액 = 시간외수당 + 야간수당 + 휴일수당
+  const totalDutyPay = overtimePay + nightPay + holidayDutyPay;
 
   const leaveDeductionTotal =
     leaveCounts.당번연가 * calculateLeaveDeduction(rate, "당번연가") +
@@ -193,7 +206,7 @@ export function calculateMonthlySalary({
     extraDutyCounts.야간대기 * calculateExtraDutyPay(rate, "야간대기") +
     extraDutyCounts.주간대기 * calculateExtraDutyPay(rate, "주간대기");
 
-  // 세전 보수 총계 = 기본급 + 초과수당 + 희망대기수당 - 연가차감액 + 기타고정수당
+  // 세전 보수 총계 = 봉급 + 당번초과수당 + 대기수당 - 연가차감액 + 기타고정수당
   const grossTotalSalary = rate.baseSalary + totalDutyPay + extraDutyPayTotal - leaveDeductionTotal + fixedAllowance;
 
   // 4. 공제 항목 및 실수령액 산출
@@ -210,7 +223,7 @@ export function calculateMonthlySalary({
     month,
     workYear,
     workMonth,
-    usePreviousMonthSchedule,
+    usePreviousMonthSchedule: true,
     rank,
     step,
     baseSalary: rate.baseSalary,
@@ -219,8 +232,13 @@ export function calculateMonthlySalary({
     dailyHoliday: rate.dailyHoliday,
     weekdayDutyCount,
     holidayDutyCount,
-    totalDutyCount: weekdayDutyCount + holidayDutyCount,
-    weekdayDutyPay,
+    totalDutyCount,
+    totalDutyHours,
+    regularWorkHours,
+    overtimeHours,
+    nightHours,
+    overtimePay,
+    nightPay,
     holidayDutyPay,
     totalDutyPay,
     leaveCounts,
