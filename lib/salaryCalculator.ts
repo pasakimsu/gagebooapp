@@ -19,6 +19,7 @@ export interface LeaveCounts {
   당번연가: number;
   야간연가: number;
   주간연가: number;
+  육아시간: number;
 }
 
 export interface ExtraDutyCounts {
@@ -46,7 +47,7 @@ export interface SalaryCalculationResult {
   effectiveDutyCount: number; // 실제 근무 당번 횟수 (총당번 - 당번연가)
   totalDutyHours: number; // 실제 근무 당번 시수 (N회 × 24h)
   regularWorkHours: number; // 봉급에 포함된 월 정규근무시간 (166h)
-  partialLeaveHours: number; // 주간/야간연가(건강검진 등) 차감 시수 (12h/회)
+  partialLeaveHours: number; // 주간/야간연가/육아시간 차감 시수 (12h/2h/회)
   overtimeHours: number; // 시간외 인정시간 (실제당번시수 - 166h - 연가시수)
   nightHours: number; // 야간수당 인정시간 (실제당번횟수 × 8h)
   overtimePay: number; // 시간외수당 금액 (원)
@@ -136,7 +137,7 @@ export function calculateMonthlySalary({
   let holidayDutyCount = 0;
   let autoHolidayLeaveCount = 0;
 
-  const autoLeaveCounts: LeaveCounts = { 당번연가: 0, 야간연가: 0, 주간연가: 0 };
+  const autoLeaveCounts: LeaveCounts = { 당번연가: 0, 야간연가: 0, 주간연가: 0, 육아시간: 0 };
   const autoExtraDutyCounts: ExtraDutyCounts = { 당번대기: 0, 야간대기: 0, 주간대기: 0 };
 
   for (let day = 1; day <= daysInWorkMonth; day++) {
@@ -172,7 +173,7 @@ export function calculateMonthlySalary({
 
       if (!isBakSchedule) continue;
 
-      // 연가 키워드 감지 (주간연가 + 건강검진 / 검진 / 공가 추가)
+      // 연가 키워드 감지 (주간연가 + 건강검진 / 검진 / 공가 / 육아시간 추가)
       if (text.includes("당번연가") || text.includes("연가(당번)")) {
         autoLeaveCounts.당번연가++;
         if (label === "당번" && isHol) {
@@ -180,6 +181,8 @@ export function calculateMonthlySalary({
         }
       } else if (text.includes("야간연가") || text.includes("연가(야간)")) {
         autoLeaveCounts.야간연가++;
+      } else if (text.includes("육아시간")) {
+        autoLeaveCounts.육아시간++;
       } else if (
         text.includes("주간연가") ||
         text.includes("연가(주간)") ||
@@ -209,8 +212,8 @@ export function calculateMonthlySalary({
   const totalDutyHours = effectiveDutyCount * 24;
   const regularWorkHours = 166;
 
-  // 주간연가/야간연가(건강검진, 공가 등) 사용으로 인한 차감 시수 (1회당 12시간)
-  const partialLeaveHours = leaveCounts.주간연가 * 12 + leaveCounts.야간연가 * 12;
+  // 주간연가/야간연가(건강검진, 공가 등 12h) + 육아시간(1회당 2시간) 사용으로 인한 차감 시수
+  const partialLeaveHours = leaveCounts.주간연가 * 12 + leaveCounts.야간연가 * 12 + (leaveCounts.육아시간 || 0) * 2;
 
   // 시간외 인정시간 = 실제 근무 당번 시수 (N회 × 24h) - 정규근무시간 (166h) - 부분연가 차감 시수
   const overtimeHours = Math.max(0, totalDutyHours - regularWorkHours - partialLeaveHours);
