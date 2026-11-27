@@ -55,41 +55,22 @@ export async function POST(req: NextRequest) {
     }
 
     // 'family' 주제를 구독한 모든 기기에 메시지 전송
+    // Note: top-level notification, webpush, apns에 title/body를 중복 지정하면
+    // iOS 및 브라우저에서 3중 중복 알림이 발생하므로 단일 notification 객체만 사용합니다.
     const message = {
       notification: {
         title,
         body,
       },
       topic: "family",
-      // iOS 사파리 PWA 최적화 설정
-      apns: {
-        payload: {
-          aps: {
-            alert: {
-              title,
-              body,
-            },
-            sound: "default",
-            badge: 1,
-            // iOS에서 백그라운드 수신 확률을 높이는 핵심 설정
-            mutableContent: true,
-            contentAvailable: true,
-            interruptionLevel: "time-sensitive" as const,
-          },
-        },
-      },
-      // 웹 푸시 공통 설정
       webpush: {
         headers: {
           Urgency: "high",
         },
         notification: {
-          title,
-          body,
           icon: "/next.svg",
           badge: "/next.svg",
           tag: "family-notification",
-          requireInteraction: true,
         },
         fcmOptions: {
           link: "/",
@@ -100,6 +81,17 @@ export async function POST(req: NextRequest) {
         notification: {
           sound: "default",
           channelId: "family_channel",
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: "default",
+            badge: 1,
+            mutableContent: true,
+            contentAvailable: true,
+            interruptionLevel: "time-sensitive" as const,
+          },
         },
       },
     };
