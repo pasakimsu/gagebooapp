@@ -323,9 +323,9 @@ export default function SalaryEstimateBadge({
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-[11px] text-gray-300 pt-1">
                   <div className="bg-gray-800/40 p-2 rounded-lg">
-                    <p className="text-gray-400">총 당번 근무 ({result.workMonth}월)</p>
+                    <p className="text-gray-400">실제 근무 당번 ({result.workMonth}월)</p>
                     <p className="font-extrabold text-white text-xs mt-0.5">
-                      {result.totalDutyCount}회 <span className="text-[10px] text-gray-400 font-normal">(평일 {result.weekdayDutyCount} / 휴일 {result.holidayDutyCount})</span>
+                      {result.effectiveDutyCount}회 <span className="text-[10px] text-gray-400 font-normal">(총 {result.totalDutyCount}회 중 연가 {result.leaveCounts.당번연가}회)</span>
                     </p>
                   </div>
                   <div className="bg-gray-800/40 p-2 rounded-lg">
@@ -350,7 +350,7 @@ export default function SalaryEstimateBadge({
                   </div>
 
                   <div className="flex justify-between items-center text-emerald-300">
-                    <span>➕ 당번 초과근무 수당 ({result.workMonth}월 {result.totalDutyCount}회 실적)</span>
+                    <span>➕ 당번 초과근무 수당 ({result.workMonth}월 {result.effectiveDutyCount}회 근무실적)</span>
                     <span className="font-bold">+{result.totalDutyPay.toLocaleString()}원</span>
                   </div>
 
@@ -378,7 +378,7 @@ export default function SalaryEstimateBadge({
 
                   {result.leaveDeductionTotal > 0 && (
                     <div className="flex justify-between items-center text-rose-300">
-                      <span>➖ 연가 차감액</span>
+                      <span>➖ 주간/야간연가 차감액</span>
                       <span className="font-bold">-{result.leaveDeductionTotal.toLocaleString()}원</span>
                     </div>
                   )}

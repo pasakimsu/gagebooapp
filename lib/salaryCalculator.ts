@@ -38,13 +38,14 @@ export interface SalaryCalculationResult {
   hourlyOvertime: number; // 시간외수당 단가
   hourlyNight: number; // 야간수당 단가
   dailyHoliday: number; // 휴일수당 단가
-  weekdayDutyCount: number; // 평일 당번 횟수
-  holidayDutyCount: number; // 휴일/주말 당번 횟수
-  totalDutyCount: number; // 총 당번 횟수
-  totalDutyHours: number; // 총 당번 시수 (N회 × 24h)
+  weekdayDutyCount: number; // 스케줄 상 평일 당번 횟수
+  holidayDutyCount: number; // 스케줄 상 휴일/주말 당번 횟수
+  totalDutyCount: number; // 스케줄 상 총 당번 횟수
+  effectiveDutyCount: number; // 실제 근무 당번 횟수 (총당번 - 당번연가)
+  totalDutyHours: number; // 실제 근무 당번 시수 (N회 × 24h)
   regularWorkHours: number; // 봉급에 포함된 월 정규근무시간 (166h)
-  overtimeHours: number; // 시간외 인정시간 (총당번시수 - 166h)
-  nightHours: number; // 야간수당 인정시간 (당번횟수 × 8h)
+  overtimeHours: number; // 시간외 인정시간 (실제당번시수 - 166h)
+  nightHours: number; // 야간수당 인정시간 (실제당번횟수 × 8h)
   overtimePay: number; // 시간외수당 금액 (원)
   nightPay: number; // 야간수당 금액 (원)
   holidayDutyPay: number; // 휴일수당 금액 (원)
@@ -179,15 +180,18 @@ export function calculateMonthlySalary({
   // 3. 3조 1교대(당비비) 초과근무 수당 산출
   // 월 정규근무시간(기본급으로 커버되는 기준시간): 약 166시간
   const totalDutyCount = weekdayDutyCount + holidayDutyCount;
-  const totalDutyHours = totalDutyCount * 24;
+
+  // 실제 근무 당번 횟수 (스케줄 상 당번 횟수 - 당번연가 횟수)
+  const effectiveDutyCount = Math.max(0, totalDutyCount - leaveCounts.당번연가);
+  const totalDutyHours = effectiveDutyCount * 24;
   const regularWorkHours = 166;
 
-  // 시간외 인정시간 = 총 당번 시수 (N회 × 24h) - 정규근무시간 (166h)
+  // 시간외 인정시간 = 실제 근무 당번 시수 (N회 × 24h) - 정규근무시간 (166h)
   const overtimeHours = Math.max(0, totalDutyHours - regularWorkHours);
   const overtimePay = overtimeHours * rate.hourlyOvertime;
 
-  // 야간수당 인정시간 = 당번 횟수 × 8h (22:00 ~ 06:00)
-  const nightHours = totalDutyCount * 8;
+  // 야간수당 인정시간 = 실제 근무 당번 횟수 × 8h (22:00 ~ 06:00)
+  const nightHours = effectiveDutyCount * 8;
   const nightPay = nightHours * rate.hourlyNight;
 
   // 휴일수당 인정일수 = 휴일/주말 당번 횟수
@@ -196,8 +200,8 @@ export function calculateMonthlySalary({
   // 당번 초과근무 수당 총액 = 시간외수당 + 야간수당 + 휴일수당
   const totalDutyPay = overtimePay + nightPay + holidayDutyPay;
 
+  // 부분 연가(주간/야간연가) 금액 차감액
   const leaveDeductionTotal =
-    leaveCounts.당번연가 * calculateLeaveDeduction(rate, "당번연가") +
     leaveCounts.야간연가 * calculateLeaveDeduction(rate, "야간연가") +
     leaveCounts.주간연가 * calculateLeaveDeduction(rate, "주간연가");
 
@@ -233,6 +237,7 @@ export function calculateMonthlySalary({
     weekdayDutyCount,
     holidayDutyCount,
     totalDutyCount,
+    effectiveDutyCount,
     totalDutyHours,
     regularWorkHours,
     overtimeHours,
