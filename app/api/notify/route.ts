@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApps, initializeApp, cert } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
+import { getFirestore } from "firebase-admin/firestore";
 
 let initError: string | null = null;
 
@@ -15,13 +16,11 @@ if (!getApps().length) {
         credential: cert({
           projectId,
           clientEmail,
-          // Vercel 환경 변수에서 줄바꿈이 깨지는 경우를 대비한 보정
           privateKey: privateKey.replace(/\\n/g, '\n'),
         }),
       });
       console.log("Firebase Admin Initialized with individual variables");
     } else {
-      // 구버전(JSON 방식) 하위 호환성 유지
       let serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
       if (serviceAccountKey) {
         let rawData = serviceAccountKey.trim().replace(/^['"]|['"]$/g, '');
@@ -54,23 +53,38 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
 
-    // 'family' 주제를 구독한 모든 기기에 메시지 전송
-    // Note: top-level notification, webpush, apns에 title/body를 중복 지정하면
-    // iOS 및 브라우저에서 3중 중복 알림이 발생하므로 단일 notification 객체만 사용합니다.
-    const message = {
+    const messaging = getMessaging();
+    const db = getFirestore();
+
+    // 1. Firestore에서 활성화된 FCM 토큰들을 수집하고 동일 기기 중복 토큰 제거(Set)
+    const tokenSnapshot = await db.collection("fcmTokens").get();
+    const rawTokens: string[] = [];
+
+    tokenSnapshot.docs.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (data.token && data.subscribed !== false) {
+        rawTokens.push(data.token);
+      }
+    });
+
+    const uniqueTokens = Array.from(new Set(rawTokens));
+    console.log(`Sending multicast notification to ${uniqueTokens.length} unique device tokens.`);
+
+    const notificationPayload = {
       notification: {
         title,
         body,
       },
-      topic: "family",
       webpush: {
         headers: {
           Urgency: "high",
         },
         notification: {
+          title,
+          body,
           icon: "/next.svg",
           badge: "/next.svg",
-          tag: "family-notification",
+          tag: "family-notification", // OS/브라우저 레벨 알림 창 중복 결합
         },
         fcmOptions: {
           link: "/",
@@ -86,6 +100,10 @@ export async function POST(req: NextRequest) {
       apns: {
         payload: {
           aps: {
+            alert: {
+              title,
+              body,
+            },
             sound: "default",
             badge: 1,
             mutableContent: true,
@@ -96,12 +114,29 @@ export async function POST(req: NextRequest) {
       },
     };
 
-    const response = await getMessaging().send(message);
-    console.log("Successfully sent topic message:", response);
+    let responseSummary: any;
 
-    return NextResponse.json({ success: true, messageId: response });
+    if (uniqueTokens.length > 0) {
+      // 2-A. 고유 기기 토큰들로 0.1초 즉시 멀티캐스트 전송 (가장 확실하고 단일 발송 보장)
+      const multicastResponse = await messaging.sendEachForMulticast({
+        tokens: uniqueTokens,
+        ...notificationPayload,
+      });
+      console.log(`Multicast success: ${multicastResponse.successCount}, failure: ${multicastResponse.failureCount}`);
+      responseSummary = multicastResponse;
+    } else {
+      // 2-B. 기기 토큰이 없는 경우 fallback으로 'family' 주제로 전송
+      const topicResponse = await messaging.send({
+        topic: "family",
+        ...notificationPayload,
+      });
+      console.log("Topic fallback response:", topicResponse);
+      responseSummary = topicResponse;
+    }
+
+    return NextResponse.json({ success: true, details: responseSummary });
   } catch (error: any) {
-    console.error("Error sending topic notification:", error);
+    console.error("Error sending notification:", error);
     return NextResponse.json({
       error: "Failed to send notification",
       details: error.message

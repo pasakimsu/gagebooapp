@@ -47,8 +47,8 @@ export interface SalaryCalculationResult {
   effectiveDutyCount: number; // 실제 근무 당번 횟수 (총당번 - 당번연가)
   totalDutyHours: number; // 실제 근무 당번 시수 (N회 × 24h)
   regularWorkHours: number; // 봉급에 포함된 월 정규근무시간 (166h)
-  partialLeaveHours: number; // 주간/야간연가/육아시간/당번연가 차감 시수
-  overtimeHours: number; // 시간외 인정시간 (기본시간외 - 연가시수)
+  partialLeaveHours: number; // 주간/야간연가/육아시간 차감 시수 (12h/2h/회)
+  overtimeHours: number; // 시간외 인정시간 (실제당번시수 - 166h - 부분연가시수)
   nightHours: number; // 야간수당 인정시간 (실제당번횟수 × 8h)
   overtimePay: number; // 시간외수당 금액 (원)
   nightPay: number; // 야간수당 금액 (원)
@@ -204,24 +204,22 @@ export function calculateMonthlySalary({
   const leaveCounts = manualLeaveCounts || autoLeaveCounts;
   const extraDutyCounts = manualExtraDutyCounts || autoExtraDutyCounts;
 
-  // 3. 3조 1교대(당비비) 초과근무 수당 산출
+  // 3. 3조 1교대(당비비) 초과근무 수당 산출 범용 통합 수식
   const totalDutyCount = weekdayDutyCount + holidayDutyCount;
 
-  // 실제 근무 당번 횟수 (스케줄 상 당번 횟수 - 당번연가 횟수)
+  // 실제 근무한 당번 횟수 = 스케줄상 당번 횟수 - 당번연가 횟수
   const effectiveDutyCount = Math.max(0, totalDutyCount - leaveCounts.당번연가);
-  const totalDutyHours = totalDutyCount * 24; // 만근 24시간 총시수 기준
+  const actualWorkedDutyHours = effectiveDutyCount * 24;
   const regularWorkHours = 166;
 
-  // 소방공무원 초과근무 시수 차감 지침:
-  // - 24시간 당번연가 1회당 시간외 시수는 17.5시간 차감 (24시간 중 정규 8h 제외한 초과분)
-  // - 주간/야간연가(건강검진/공가 등) 1회당 12시간 차감
-  // - 육아시간 1회당 2시간 차감
-  const dutyLeaveOvertimeDeduction = leaveCounts.당번연가 * 17.5;
+  // 기본 시간외 인정 시수 = 실제 근무 당번 시수(N회 × 24h) - 월 정규근무시간(166h)
+  const baseOvertimeHours = Math.max(0, actualWorkedDutyHours - regularWorkHours);
+
+  // 부분연가(주간연가/야간연가 12h, 육아시간 2h) 차감 시수
   const partialLeaveHours = leaveCounts.주간연가 * 12 + leaveCounts.야간연가 * 12 + (leaveCounts.육아시간 || 0) * 2;
 
-  // 시간외 인정시간 = 만근 시수(240h) - 정규시간(166h) - 당번연가시간외차감(17.5h/회) - 부분연가차감(12h/2h/회)
-  const baseOvertimeHours = Math.max(0, totalDutyHours - regularWorkHours);
-  const overtimeHours = Math.max(0, Math.round(baseOvertimeHours - dutyLeaveOvertimeDeduction - partialLeaveHours));
+  // 최종 시간외 인정 시수 = 기본시간외 - 부분연가차감시수
+  const overtimeHours = Math.max(0, baseOvertimeHours - partialLeaveHours);
   const overtimePay = overtimeHours * rate.hourlyOvertime;
 
   // 야간수당 인정시간 = 실제 근무 당번 횟수 × 8h (22:00 ~ 06:00)
@@ -269,9 +267,9 @@ export function calculateMonthlySalary({
     effectiveHolidayDutyCount,
     totalDutyCount,
     effectiveDutyCount,
-    totalDutyHours,
+    totalDutyHours: actualWorkedDutyHours,
     regularWorkHours,
-    partialLeaveHours: Math.round(dutyLeaveOvertimeDeduction + partialLeaveHours),
+    partialLeaveHours,
     overtimeHours,
     nightHours,
     overtimePay,
