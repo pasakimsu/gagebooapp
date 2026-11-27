@@ -7,6 +7,7 @@ import {
   calculateExtraDutyPay,
   calculateDeductions,
 } from "./salaryData";
+import { isWeekendOrHoliday } from "./holidayUtils";
 
 export interface ScheduleItem {
   id?: string;
@@ -39,7 +40,7 @@ export interface SalaryCalculationResult {
   hourlyNight: number; // 야간수당 단가
   dailyHoliday: number; // 휴일수당 단가
   weekdayDutyCount: number; // 스케줄 상 평일 당번 횟수
-  holidayDutyCount: number; // 스케줄 상 휴일/주말 당번 횟수
+  holidayDutyCount: number; // 스케줄 상 휴일/주말/대체공휴일 당번 횟수
   effectiveHolidayDutyCount: number; // 실제 근무한 휴일 당번 횟수 (휴일연가 차감 반영)
   totalDutyCount: number; // 스케줄 상 총 당번 횟수
   effectiveDutyCount: number; // 실제 근무 당번 횟수 (총당번 - 당번연가)
@@ -73,14 +74,6 @@ export function getDutyLabel(date: Date, dutyStartDate: Date): "당번" | "비�
   const diff = Math.floor((target.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
   const index = ((diff % 3) + 3) % 3;
   return index === 0 ? "당번" : "비번";
-}
-
-/**
- * 주말(토/일) 여부 확인
- */
-export function isWeekend(date: Date): boolean {
-  const day = date.getDay();
-  return day === 0 || day === 6;
 }
 
 /**
@@ -149,7 +142,7 @@ export function calculateMonthlySalary({
     const date = new Date(workYear, workMonth - 1, day);
     const { std, old } = formatDateFormats(date);
     const label = getDutyLabel(date, dutyStartDate);
-    const isHol = isWeekend(date);
+    const isHol = isWeekendOrHoliday(date); // 주말 및 대체공휴일/국경일 포함 검증
 
     if (label === "당번") {
       if (isHol) {
