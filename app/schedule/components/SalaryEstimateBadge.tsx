@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   FirefighterRank,
-  BASE_10STEP_SALARY_2026,
+  BASE_ANCHOR_SALARY_2026,
   getBaseSalaryByStep,
 } from "@/lib/salaryData";
 import {
@@ -42,10 +42,14 @@ export default function SalaryEstimateBadge({
   const [userId, setUserId] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
 
-  // 계급 & 호봉 설정
+  // 계급 & 호봉 설정 (기본값: 소방교 11호봉 - 실제 보수명세서 연동)
   const [rank, setRank] = useState<FirefighterRank>("소방교");
-  const [step, setStep] = useState<number>(10);
+  const [step, setStep] = useState<number>(11);
   const [customBaseSalary, setCustomBaseSalary] = useState<string>("");
+
+  // 기타 고정 수당 합계 (직급보조비, 정액급식비, 위험수당, 대우수당, 출동가산금, 가족수당 등)
+  // 기본값: 약 870,490원 (실제 명세서 기반)
+  const [fixedAllowance, setFixedAllowance] = useState<string>("870,490");
 
   const [showAdjust, setShowAdjust] = useState(false);
 
@@ -59,18 +63,25 @@ export default function SalaryEstimateBadge({
       setUserId(storedUser);
 
       const storedRank = localStorage.getItem("firefighterRank") as FirefighterRank;
-      if (storedRank && BASE_10STEP_SALARY_2026[storedRank]) {
+      if (storedRank && BASE_ANCHOR_SALARY_2026[storedRank]) {
         setRank(storedRank);
       }
 
       const storedStep = localStorage.getItem("firefighterStep");
       if (storedStep && !isNaN(Number(storedStep))) {
         setStep(Number(storedStep));
+      } else {
+        setStep(11); // 소방교 11호봉 기본값
       }
 
       const storedCustomSalary = localStorage.getItem("firefighterCustomSalary");
       if (storedCustomSalary) {
         setCustomBaseSalary(storedCustomSalary);
+      }
+
+      const storedFixed = localStorage.getItem("firefighterFixedAllowance");
+      if (storedFixed !== null) {
+        setFixedAllowance(storedFixed);
       }
     }
   }, []);
@@ -97,6 +108,14 @@ export default function SalaryEstimateBadge({
     }
   };
 
+  const handleFixedAllowanceChange = (val: string) => {
+    const numeric = val.replace(/[^\d]/g, "");
+    setFixedAllowance(numeric ? Number(numeric).toLocaleString() : "");
+    if (typeof window !== "undefined") {
+      localStorage.setItem("firefighterFixedAllowance", numeric ? Number(numeric).toLocaleString() : "");
+    }
+  };
+
   // bak 또는 admin 계정만 노출
   if (userId !== "bak" && userId !== "admin") {
     return null;
@@ -106,6 +125,7 @@ export default function SalaryEstimateBadge({
   const month = currentDate.getMonth() + 1;
 
   const parsedCustomSalary = customBaseSalary ? Number(customBaseSalary.replace(/,/g, "")) : undefined;
+  const parsedFixedAllowance = fixedAllowance ? Number(fixedAllowance.replace(/,/g, "")) : 0;
 
   const result = calculateMonthlySalary({
     year,
@@ -119,21 +139,23 @@ export default function SalaryEstimateBadge({
     manualExtraDutyCounts: manualExtra || undefined,
   });
 
+  const grossTotalSalary = result.estimatedTotalSalary + parsedFixedAllowance;
+
   const ranksList: FirefighterRank[] = ["소방령", "소방경", "소방위", "소방장", "소방교", "소방사"];
-  const stepsList = Array.from({ length: 31 }, (_, i) => i + 1); // 1호봉 ~ 31호봉
+  const stepsList = Array.from({ length: 31 }, (_, i) => i + 1);
 
   return (
     <div className="relative inline-block text-left">
-      {/* 1. 우측 상단 컴팩트 라벨 배지 (Header Badge Button) */}
+      {/* 1. 우측 상단 컴팩트 라벨 배지 */}
       <button
         onClick={() => setIsOpen(true)}
         className="flex items-center gap-1.5 px-3 py-1.5 bg-[#3a312a] hover:bg-[#4a3f37] border border-[#FFC90E]/40 text-[#FFC90E] rounded-full text-xs font-bold shadow-md transition active:scale-95 cursor-pointer"
-        title="bak님 당월 예상 월급 명세서 보기"
+        title="bak님 실제 보수명세서 연동 예상 월급 보기"
       >
         <span className="text-[10px] bg-[#FFC90E]/20 text-[#FFC90E] px-1.5 py-0.5 rounded-md font-extrabold">
           🔒 bak
         </span>
-        <span>💰 {month}월 예상 {Math.floor(result.estimatedTotalSalary / 10000).toLocaleString()}만원</span>
+        <span>💰 {month}월 예상 {Math.floor(grossTotalSalary / 10000).toLocaleString()}만원</span>
         <span className="text-[10px] text-gray-400">▼</span>
       </button>
 
@@ -148,9 +170,9 @@ export default function SalaryEstimateBadge({
                 <span className="text-xl">💰</span>
                 <div>
                   <h3 className="font-bold text-sm sm:text-base text-[#FFC90E]">
-                    {year}년 {month}월 예상 월급 명세서
+                    {year}년 {month}월 예상 보수 명세서
                   </h3>
-                  <p className="text-[10px] text-gray-400">3조 1교대(당비비) + 2026년 봉급/수당 단가 적용</p>
+                  <p className="text-[10px] text-gray-400">실제 보수지급명세서 기준 (소방교 11호봉 등)</p>
                 </div>
               </div>
               <button
@@ -198,26 +220,41 @@ export default function SalaryEstimateBadge({
                   </div>
                 </div>
 
-                {/* 사용자 지정 기본급 수동 입력 (선택) */}
-                <div className="pt-2 border-t border-brownBorder/20">
-                  <div className="flex items-center justify-between gap-2">
-                    <label className="text-[11px] text-gray-400">기본급 직접 입력 (선택)</label>
-                    {customBaseSalary && (
-                      <button
-                        onClick={() => handleCustomSalaryChange("")}
-                        className="text-[10px] text-rose-300 hover:underline"
-                      >
-                        자동 호봉으로 초기화
-                      </button>
-                    )}
+                {/* 기본급 및 기타 수당 설정 */}
+                <div className="pt-2 border-t border-brownBorder/20 space-y-2">
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-[11px] text-gray-400">봉급(기본급) 수동 수정</label>
+                      {customBaseSalary && (
+                        <button
+                          onClick={() => handleCustomSalaryChange("")}
+                          className="text-[10px] text-rose-300 hover:underline"
+                        >
+                          호봉 기본값으로 초기화
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      placeholder={`기본 호봉가: ${getBaseSalaryByStep(rank, step).toLocaleString()}원`}
+                      value={customBaseSalary}
+                      onChange={(e) => handleCustomSalaryChange(e.target.value)}
+                      className="w-full mt-1 p-2 rounded-lg bg-gray-900 text-white border border-brownBorder/50 text-xs outline-none focus:ring-1 focus:ring-amber-400 placeholder-gray-500"
+                    />
                   </div>
-                  <input
-                    type="text"
-                    placeholder={`기본 호봉가: ${getBaseSalaryByStep(rank, step).toLocaleString()}원`}
-                    value={customBaseSalary}
-                    onChange={(e) => handleCustomSalaryChange(e.target.value)}
-                    className="w-full mt-1 p-2 rounded-lg bg-gray-900 text-white border border-brownBorder/50 text-xs outline-none focus:ring-1 focus:ring-amber-400 placeholder-gray-500"
-                  />
+
+                  <div>
+                    <label className="block text-[11px] text-gray-400 mb-1">
+                      기타 고정 수당 합계 (직급보조비, 정액급식비, 위험/대우/출동가산금 등)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="870,490"
+                      value={fixedAllowance}
+                      onChange={(e) => handleFixedAllowanceChange(e.target.value)}
+                      className="w-full p-2 rounded-lg bg-gray-900 text-white border border-brownBorder/50 text-xs outline-none focus:ring-1 focus:ring-amber-400 placeholder-gray-500"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -245,7 +282,7 @@ export default function SalaryEstimateBadge({
               {/* 세부 수당 계산 내역 */}
               <div className="bg-[#3a312a] p-4 rounded-xl border border-brownBorder/30 space-y-2.5">
                 <p className="font-bold text-gray-300 text-xs border-b border-brownBorder/20 pb-2">
-                  📊 {rank} {step}호봉 수당 세부 명세서 (세전)
+                  📊 {rank} {step}호봉 보수 세부 명세서 (세전)
                 </p>
 
                 <div className="space-y-2 text-xs">
@@ -255,17 +292,13 @@ export default function SalaryEstimateBadge({
                   </div>
 
                   <div className="flex justify-between items-center text-emerald-300">
-                    <span>➕ 당번 근무 수당 ({result.totalDutyCount}회)</span>
+                    <span>➕ 당번 초과근무 수당 ({result.totalDutyCount}회)</span>
                     <span className="font-bold">+{result.totalDutyPay.toLocaleString()}원</span>
                   </div>
                   <div className="pl-3 text-[10px] text-gray-400 space-y-0.5 border-l-2 border-emerald-500/30">
                     <div className="flex justify-between">
-                      <span>• 평일 당번 ({result.weekdayDutyCount}회)</span>
-                      <span>{result.weekdayDutyPay.toLocaleString()}원</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>• 휴일 당번 ({result.holidayDutyCount}회, 휴일수당가산)</span>
-                      <span>{result.holidayDutyPay.toLocaleString()}원</span>
+                      <span>• 시간외 단가: {result.hourlyOvertime.toLocaleString()}원 / 야간: {result.hourlyNight.toLocaleString()}원</span>
+                      <span>평일 {result.weekdayDutyCount}회 / 휴일 {result.holidayDutyCount}회</span>
                     </div>
                   </div>
 
@@ -282,16 +315,23 @@ export default function SalaryEstimateBadge({
                       <span className="font-bold">-{result.leaveDeductionTotal.toLocaleString()}원</span>
                     </div>
                   )}
+
+                  {parsedFixedAllowance > 0 && (
+                    <div className="flex justify-between items-center text-amber-300 pt-1 border-t border-white/5">
+                      <span>➕ 기타 고정 수당 합계 (직급보조비/급식비/위험수당 등)</span>
+                      <span className="font-bold">+{parsedFixedAllowance.toLocaleString()}원</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* 최종 합계 */}
                 <div className="pt-3 border-t border-brownBorder/40 flex flex-col items-end gap-1">
-                  <p className="text-[11px] text-gray-400 font-medium">{year}년 {month}월 예상 총 수령액 (세전)</p>
+                  <p className="text-[11px] text-gray-400 font-medium">{year}년 {month}월 예상 보수 총계 (세전)</p>
                   <p className="text-lg sm:text-xl font-black text-[#FFC90E]">
-                    {result.estimatedTotalSalary.toLocaleString()}원
+                    {grossTotalSalary.toLocaleString()}원
                   </p>
                   <p className="text-[10px] text-amber-200/80 font-bold">
-                    ({numberToKorean(result.estimatedTotalSalary)})
+                    ({numberToKorean(grossTotalSalary)})
                   </p>
                 </div>
               </div>
