@@ -17,42 +17,27 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// 백그라운드 메시지 핸들러 (Firebase 라이브러리 방식)
+// 백그라운드 메시지 핸들러
+// Note: notification 페이로드가 포함된 푸시는 FCM SDK에서 자동 알림 창을 띄우므로,
+// 수동 showNotification 중복 호출을 제거하여 알림이 1개만 오도록 고정합니다.
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
-  const notificationTitle = payload.notification?.title || "우리집 가계부";
-  const notificationOptions = {
-    body: payload.notification?.body || "새로운 일정이 등록되었습니다.",
-    icon: '/next.svg',
-    badge: '/next.svg',
-    tag: 'family-notification',
-    data: payload.data
-  };
 
-  return self.registration.showNotification(notificationTitle, notificationOptions);
-});
-
-// 브라우저 네이티브 push 이벤트 가로채기 (백업용)
-self.addEventListener('push', (event) => {
-  if (event.data) {
-    const data = event.data.json();
-    console.log('Native push event received:', data);
-
-    // Firebase가 이미 처리하지 않은 경우에만 수동으로 표시
-    if (data.notification) {
-      const title = data.notification.title || "우리집 가계부";
-      const options = {
-        body: data.notification.body,
-        icon: '/next.svg',
-        badge: '/next.svg',
-        data: data.data
-      };
-      event.waitUntil(self.registration.showNotification(title, options));
-    }
+  // notification 객체가 없는 data-only 푸시인 경우에만 수동으로 1회 표시
+  if (!payload.notification && payload.data) {
+    const notificationTitle = payload.data.title || "우리집 가계부";
+    const notificationOptions = {
+      body: payload.data.body || "새로운 일정이 등록되었습니다.",
+      icon: '/next.svg',
+      badge: '/next.svg',
+      tag: 'family-notification',
+      data: payload.data
+    };
+    return self.registration.showNotification(notificationTitle, notificationOptions);
   }
 });
 
-// 알림 클릭 시 앱으로 이동
+// 알림 클릭 시 앱 화면으로 즉시 전환
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   event.waitUntil(
